@@ -8,9 +8,13 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     max_text_chars: int = 100_000
-    textcordings_table_name: str = Field(
-        default="local-textcordings",
-        validation_alias=AliasChoices("TEXTCORDINGS_TABLE_NAME", "TEXTS_TABLE_NAME"),
+    readings_table_name: str = Field(
+        default="local-readings",
+        validation_alias=AliasChoices(
+            "READINGS_TABLE_NAME",
+            "TEXTCORDINGS_TABLE_NAME",
+            "TEXTS_TABLE_NAME",
+        ),
     )
     processor_function_name: str | None = Field(
         default=None,

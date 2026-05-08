@@ -10,17 +10,17 @@ class ErrorResponse(BaseModel):
     error: ApiError
 
 
-class TextCordingCreateRequest(BaseModel):
+class ReadingCreateRequest(BaseModel):
     original_text: str
     vendor: str | None = Field(default=None, max_length=120)
     voice: str | None = Field(default=None, max_length=120)
 
 
-class TextCording(BaseModel):
+class Reading(BaseModel):
     id: str
-    original_text: str
-    read_text: str | None = None
-    recording: str | None = None
+    original_text_key: str
+    corrected_text_key: str | None = None
+    recording_key: str | None = None
     vendor: str | None = None
     voice: str | None = None
     status: str
@@ -30,6 +30,6 @@ class TextCording(BaseModel):
     updated_at: str
 
 
-class TextCordingListResponse(BaseModel):
-    items: list[TextCording]
+class ReadingListResponse(BaseModel):
+    items: list[Reading]
     next_cursor: str | None = None

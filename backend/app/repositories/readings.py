@@ -24,7 +24,7 @@ def _decode_cursor(cursor: str | None) -> dict | None:
     return json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
 
 
-class TextCordingRepository:
+class ReadingRepository:
     def __init__(self, table_name: str, processor_function_name: str | None) -> None:
         self.table = boto3.resource("dynamodb").Table(table_name)
         self.processor_function_name = processor_function_name
@@ -33,41 +33,50 @@ class TextCordingRepository:
     def create(
         self,
         owner_user_id: str,
-        original_text: str,
+        reading_id: str,
+        original_text_key: str,
+        char_count: int,
         vendor: str | None,
         voice: str | None,
     ) -> dict:
-        textcording_id = str(ulid.new())
         now = _now()
         item = {
             "pk": f"USER#{owner_user_id}",
-            "sk": f"TEXTCORDING#{textcording_id}",
-            "textcording_id": textcording_id,
+            "sk": f"READING#{reading_id}",
+            "reading_id": reading_id,
             "owner_user_id": owner_user_id,
-            "original_text": original_text,
-            "read_text": None,
-            "recording": None,
+            "original_text_key": original_text_key,
+            "corrected_text_key": None,
+            "recording_key": None,
             "vendor": vendor,
             "voice": voice,
             "status": "processing",
             "metadata": {},
-            "char_count": len(original_text),
+            "char_count": char_count,
             "created_at": now,
             "updated_at": now,
         }
 
         self.table.put_item(Item=item)
         try:
-            self._start_processing(owner_user_id, textcording_id)
+            self._start_processing(owner_user_id, reading_id, original_text_key)
         except ProcessingStartError:
-            self._mark_processing_start_failed(owner_user_id, textcording_id)
+            self._mark_processing_start_failed(owner_user_id, reading_id)
             item["status"] = "failed_to_start"
             item["metadata"] = {"processing_start_error": "lambda_invoke_failed"}
             item["updated_at"] = _now()
             raise
         return item
 
-    def _start_processing(self, owner_user_id: str, textcording_id: str) -> None:
+    def next_id(self) -> str:
+        return str(ulid.new())
+
+    def _start_processing(
+        self,
+        owner_user_id: str,
+        reading_id: str,
+        original_text_key: str,
+    ) -> None:
         if not self.lambda_client or not self.processor_function_name:
             raise ProcessingStartError
 
@@ -76,7 +85,11 @@ class TextCordingRepository:
                 FunctionName=self.processor_function_name,
                 InvocationType="Event",
                 Payload=json.dumps(
-                    {"textcording_id": textcording_id, "owner_user_id": owner_user_id}
+                    {
+                        "reading_id": reading_id,
+                        "owner_user_id": owner_user_id,
+                        "original_text_key": original_text_key,
+                    }
                 ).encode(),
             )
         except (BotoCoreError, ClientError) as exc:
@@ -85,9 +98,9 @@ class TextCordingRepository:
         if response.get("StatusCode") != 202:
             raise ProcessingStartError
 
-    def _mark_processing_start_failed(self, owner_user_id: str, textcording_id: str) -> None:
+    def _mark_processing_start_failed(self, owner_user_id: str, reading_id: str) -> None:
         self.table.update_item(
-            Key={"pk": f"USER#{owner_user_id}", "sk": f"TEXTCORDING#{textcording_id}"},
+            Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"},
             UpdateExpression="SET #status = :status, metadata = :metadata, updated_at = :updated_at",
             ExpressionAttributeNames={"#status": "status"},
             ExpressionAttributeValues={
@@ -102,7 +115,7 @@ class TextCordingRepository:
     ) -> tuple[list[dict], str | None]:
         query = {
             "KeyConditionExpression": Key("pk").eq(f"USER#{owner_user_id}")
-            & Key("sk").begins_with("TEXTCORDING#"),
+            & Key("sk").begins_with("READING#"),
             "Limit": limit,
             "ScanIndexForward": False,
         }
@@ -111,20 +124,18 @@ class TextCordingRepository:
         response = self.table.query(**query)
         return response.get("Items", []), _encode_cursor(response.get("LastEvaluatedKey"))
 
-    def get(self, owner_user_id: str, textcording_id: str) -> dict | None:
-        return self._get_item(owner_user_id, textcording_id)
+    def get(self, owner_user_id: str, reading_id: str) -> dict | None:
+        return self._get_item(owner_user_id, reading_id)
 
-    def delete(self, owner_user_id: str, textcording_id: str) -> None:
-        item = self._get_item(owner_user_id, textcording_id)
+    def delete(self, owner_user_id: str, reading_id: str) -> None:
+        item = self._get_item(owner_user_id, reading_id)
         if not item:
             return
-        self.table.delete_item(
-            Key={"pk": f"USER#{owner_user_id}", "sk": f"TEXTCORDING#{textcording_id}"}
-        )
+        self.table.delete_item(Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"})
 
-    def _get_item(self, owner_user_id: str, textcording_id: str) -> dict | None:
+    def _get_item(self, owner_user_id: str, reading_id: str) -> dict | None:
         response = self.table.get_item(
-            Key={"pk": f"USER#{owner_user_id}", "sk": f"TEXTCORDING#{textcording_id}"}
+            Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"}
         )
         return response.get("Item")
 

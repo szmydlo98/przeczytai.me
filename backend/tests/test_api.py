@@ -6,9 +6,8 @@ from starlette.requests import Request
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.main import app
-from app.repositories.textcordings import ProcessingStartError
-from app.routes.textcordings import get_textcording_repository
-
+from app.repositories.readings import ProcessingStartError
+from app.routes.readings import get_file_storage, get_reading_repository
 
 NOW = "2026-05-04T12:00:00Z"
 
@@ -21,27 +20,31 @@ class FakeRepo:
     def create(
         self,
         owner_user_id: str,
-        original_text: str,
+        reading_id: str,
+        original_text_key: str,
+        char_count: int,
         vendor: str | None,
         voice: str | None,
     ) -> dict:
-        textcording_id = f"id-{len(self.items) + 1}"
         item = {
-            "textcording_id": textcording_id,
+            "reading_id": reading_id,
             "owner_user_id": owner_user_id,
-            "original_text": original_text,
-            "read_text": None,
-            "recording": None,
+            "original_text_key": original_text_key,
+            "corrected_text_key": None,
+            "recording_key": None,
             "vendor": vendor,
             "voice": voice,
             "status": "processing",
             "metadata": {},
-            "char_count": len(original_text),
+            "char_count": char_count,
             "created_at": NOW,
             "updated_at": NOW,
         }
-        self.items[(owner_user_id, textcording_id)] = item
+        self.items[(owner_user_id, reading_id)] = item
         return item
+
+    def next_id(self) -> str:
+        return f"id-{len(self.items) + 1}"
 
     def list(
         self, owner_user_id: str, limit: int, cursor: str | None
@@ -50,127 +53,257 @@ class FakeRepo:
         items = [item for (user_id, _), item in self.items.items() if user_id == owner_user_id]
         return items[:limit], None
 
-    def get(self, owner_user_id: str, textcording_id: str) -> dict | None:
-        return self.items.get((owner_user_id, textcording_id))
+    def get(self, owner_user_id: str, reading_id: str) -> dict | None:
+        return self.items.get((owner_user_id, reading_id))
 
-    def delete(self, owner_user_id: str, textcording_id: str) -> None:
-        self.deleted.append((owner_user_id, textcording_id))
-        self.items.pop((owner_user_id, textcording_id), None)
+    def delete(self, owner_user_id: str, reading_id: str) -> None:
+        self.deleted.append((owner_user_id, reading_id))
+        self.items.pop((owner_user_id, reading_id), None)
 
 
 class FailingProcessingRepo(FakeRepo):
     def create(
         self,
         owner_user_id: str,
-        original_text: str,
+        reading_id: str,
+        original_text_key: str,
+        char_count: int,
         vendor: str | None,
         voice: str | None,
     ) -> dict:
-        del owner_user_id, original_text, vendor, voice
+        del owner_user_id, reading_id, original_text_key, char_count, vendor, voice
         raise ProcessingStartError
 
 
-def client(repo: FakeRepo | None = None, auth: bool = True) -> tuple[TestClient, FakeRepo]:
+class FakeStorage:
+    def __init__(self) -> None:
+        self.texts: dict[str, str] = {}
+
+    def original_text_key(self, owner_user_id: str, reading_id: str) -> str:
+        return f"users/{owner_user_id}/readings/{reading_id}/original.txt"
+
+    def corrected_text_key(self, owner_user_id: str, reading_id: str) -> str:
+        return f"users/{owner_user_id}/readings/{reading_id}/corrected.md"
+
+    def recording_key(self, owner_user_id: str, reading_id: str) -> str:
+        return f"users/{owner_user_id}/readings/{reading_id}/recording.mp3"
+
+    def put_text(self, key: str, content: str, content_type: str) -> None:
+        del content_type
+        self.texts[key] = content
+
+    def get_text(self, key: str) -> str:
+        return self.texts[key]
+
+    def download_url(self, key: str, filename: str) -> str:
+        return f"https://files.example/{key}?filename={filename}"
+
+
+def add_reading(
+    repo: FakeRepo,
+    owner_user_id: str,
+    original_text: str = "hello",
+    vendor: str | None = None,
+    voice: str | None = None,
+) -> dict:
+    reading_id = repo.next_id()
+    return repo.create(
+        owner_user_id,
+        reading_id,
+        f"users/{owner_user_id}/readings/{reading_id}/original.txt",
+        len(original_text),
+        vendor,
+        voice,
+    )
+
+
+def client(
+    repo: FakeRepo | None = None,
+    auth: bool = True,
+    storage: FakeStorage | None = None,
+) -> tuple[TestClient, FakeRepo]:
     app.dependency_overrides.clear()
     repo = repo or FakeRepo()
+    storage = storage or FakeStorage()
     app.dependency_overrides[get_settings] = lambda: Settings(max_text_chars=10)
-    app.dependency_overrides[get_textcording_repository] = lambda: repo
+    app.dependency_overrides[get_reading_repository] = lambda: repo
+    app.dependency_overrides[get_file_storage] = lambda: storage
     if auth:
         app.dependency_overrides[get_current_user] = lambda: CurrentUser("user_1")
     return TestClient(app), repo
 
 
 def test_health() -> None:
+    """Return ok from the public health endpoint."""
     test_client, _ = client()
     assert test_client.get("/api/v1/health").json() == {"status": "ok"}
 
 
 def test_create_rejects_empty_original_text() -> None:
+    """Reject reading creation when original text is blank."""
     test_client, _ = client()
-    response = test_client.post("/api/v1/textcordings", json={"original_text": "   "})
+    response = test_client.post("/api/v1/readings", json={"original_text": "   "})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
 
 
 def test_create_rejects_large_original_text() -> None:
+    """Reject reading creation when original text exceeds the limit."""
     test_client, _ = client()
-    response = test_client.post("/api/v1/textcordings", json={"original_text": "x" * 11})
+    response = test_client.post("/api/v1/readings", json={"original_text": "x" * 11})
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "payload_too_large"
 
 
-def test_create_and_get_textcording() -> None:
-    test_client, _ = client()
-    created = test_client.post(
-        "/api/v1/textcordings",
+def test_create_and_get_reading() -> None:
+    """Create a reading and fetch it by id."""
+    storage = FakeStorage()
+    test_client, _ = client(storage=storage)
+    response = test_client.post(
+        "/api/v1/readings",
         json={"original_text": "hello", "vendor": "aws-polly", "voice": "Ola"},
-    ).json()
+    )
+    assert response.status_code == 202
+    created = response.json()
 
-    assert created["original_text"] == "hello"
-    assert created["read_text"] is None
-    assert created["recording"] is None
+    assert created["original_text_key"] == "users/user_1/readings/id-1/original.txt"
+    assert created["corrected_text_key"] is None
+    assert created["recording_key"] is None
     assert created["vendor"] == "aws-polly"
     assert created["voice"] == "Ola"
     assert created["status"] == "processing"
     assert created["char_count"] == 5
+    assert storage.texts[created["original_text_key"]] == "hello"
 
-    detail = test_client.get(f"/api/v1/textcordings/{created['id']}").json()
-    assert detail["original_text"] == "hello"
+    detail = test_client.get(f"/api/v1/readings/{created['id']}").json()
+    assert detail["original_text_key"] == created["original_text_key"]
 
 
 def test_create_returns_500_when_processing_start_fails() -> None:
+    """Return a processing error when async startup fails."""
     test_client, _ = client(FailingProcessingRepo())
 
-    response = test_client.post("/api/v1/textcordings", json={"original_text": "hello"})
+    response = test_client.post("/api/v1/readings", json={"original_text": "hello"})
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "processing_start_failed"
 
 
 def test_list_is_user_scoped() -> None:
+    """List only readings owned by the authenticated user."""
     repo = FakeRepo()
-    repo.create("user_1", "mine", None, None)
-    repo.create("user_2", "other", None, None)
+    add_reading(repo, "user_1", "mine")
+    add_reading(repo, "user_2", "other")
     test_client, _ = client(repo)
 
-    response = test_client.get("/api/v1/textcordings").json()
-    assert [item["original_text"] for item in response["items"]] == ["mine"]
+    response = test_client.get("/api/v1/readings").json()
+    assert [item["id"] for item in response["items"]] == ["id-1"]
 
 
 def test_get_missing_returns_404() -> None:
+    """Return not found for a missing reading id."""
     test_client, _ = client()
-    response = test_client.get("/api/v1/textcordings/missing")
+    response = test_client.get("/api/v1/readings/missing")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
 
 
 def test_get_other_user_item_returns_404() -> None:
+    """Hide readings owned by another user."""
     repo = FakeRepo()
-    item = repo.create("user_2", "other", None, None)
+    item = add_reading(repo, "user_2", "other")
     test_client, _ = client(repo)
 
-    response = test_client.get(f"/api/v1/textcordings/{item['textcording_id']}")
+    response = test_client.get(f"/api/v1/readings/{item['reading_id']}")
     assert response.status_code == 404
 
 
-def test_delete_textcording() -> None:
+def test_delete_reading() -> None:
+    """Delete a reading owned by the authenticated user."""
     repo = FakeRepo()
-    item = repo.create("user_1", "hello", None, None)
+    item = add_reading(repo, "user_1")
     test_client, _ = client(repo)
 
-    response = test_client.delete(f"/api/v1/textcordings/{item['textcording_id']}")
+    response = test_client.delete(f"/api/v1/readings/{item['reading_id']}")
     assert response.status_code == 204
-    assert repo.get("user_1", item["textcording_id"]) is None
+    assert repo.get("user_1", item["reading_id"]) is None
+
+
+def test_download_corrected_text() -> None:
+    """Download corrected text as a markdown attachment."""
+    repo = FakeRepo()
+    storage = FakeStorage()
+    item = add_reading(repo, "user_1")
+    item["corrected_text_key"] = storage.corrected_text_key("user_1", item["reading_id"])
+    storage.texts[item["corrected_text_key"]] = "# Hello\n"
+    test_client, _ = client(repo, storage=storage)
+
+    response = test_client.get(f"/api/v1/readings/{item['reading_id']}/corrected-text.md")
+
+    assert response.status_code == 200
+    assert response.text == "# Hello\n"
+    assert response.headers["content-type"].startswith("text/markdown")
+    assert (
+        response.headers["content-disposition"]
+        == f'attachment; filename="{item["reading_id"]}.md"'
+    )
+
+
+def test_download_corrected_text_missing_returns_404() -> None:
+    """Return not found before corrected text is ready."""
+    repo = FakeRepo()
+    item = add_reading(repo, "user_1")
+    test_client, _ = client(repo)
+
+    response = test_client.get(f"/api/v1/readings/{item['reading_id']}/corrected-text.md")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_download_recording() -> None:
+    """Redirect to a temporary recording download URL."""
+    repo = FakeRepo()
+    storage = FakeStorage()
+    item = add_reading(repo, "user_1")
+    item["recording_key"] = storage.recording_key("user_1", item["reading_id"])
+    test_client, _ = client(repo, storage=storage)
+
+    response = test_client.get(
+        f"/api/v1/readings/{item['reading_id']}/recording",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == (
+        "https://files.example/"
+        f"users/user_1/readings/{item['reading_id']}/recording.mp3"
+        f"?filename={item['reading_id']}-recording"
+    )
+
+
+def test_download_recording_missing_returns_404() -> None:
+    """Return not found before recording output is ready."""
+    repo = FakeRepo()
+    item = add_reading(repo, "user_1")
+    test_client, _ = client(repo)
+
+    response = test_client.get(f"/api/v1/readings/{item['reading_id']}/recording")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
 
 
 def test_missing_jwt_returns_401() -> None:
+    """Reject protected endpoints without JWT claims."""
     test_client, _ = client(auth=False)
-    response = test_client.get("/api/v1/textcordings")
+    response = test_client.get("/api/v1/readings")
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
 
 
 def test_auth_reads_api_gateway_jwt_claims() -> None:
+    """Read the current user id from API Gateway JWT claims."""
     request = Request(
         {
             "type": "http",

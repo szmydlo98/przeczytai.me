@@ -11,7 +11,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, str]:
     logger.info(
         "hello world",
         extra={
-            "textcording_id": event.get("textcording_id"),
+            "reading_id": event.get("reading_id") or event.get("textcording_id"),
             "owner_user_id": event.get("owner_user_id"),
         },
     )
