@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
-import { SignOutButton } from "@clerk/nextjs";
+import { SignOutButton } from "@/components/sign-out-button";
 
 export default async function Home() {
 	const { userId } = await auth();
@@ -17,14 +17,7 @@ export default async function Home() {
 					>
 						Go to protected page
 					</Link>
-					<SignOutButton>
-						<button
-							type="button"
-							className="rounded-md border border-black px-5 py-2.5 text-sm hover:bg-zinc-100"
-						>
-							Sign out
-						</button>
-					</SignOutButton>
+					<SignOutButton className="rounded-md border border-black px-5 py-2.5 text-sm hover:bg-zinc-100" />
 				</div>
 			) : (
 				<div className="flex gap-4">

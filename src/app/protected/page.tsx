@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { UserButton, SignOutButton } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
+import { SignOutButton } from "@/components/sign-out-button";
 import Link from "next/link";
 
 export default async function ProtectedPage() {
@@ -20,14 +21,7 @@ export default async function ProtectedPage() {
 
 			<div className="flex items-center gap-4">
 				<UserButton />
-				<SignOutButton>
-					<button
-						type="button"
-						className="rounded-md border border-black px-5 py-2.5 text-sm hover:bg-zinc-100"
-					>
-						Sign out
-					</button>
-				</SignOutButton>
+				<SignOutButton className="rounded-md border border-black px-5 py-2.5 text-sm hover:bg-zinc-100" />
 				<Link href="/" className="text-sm text-zinc-500 underline hover:text-black">
 					Back to home
 				</Link>
