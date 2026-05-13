@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
+import { SignOutButton } from "@clerk/nextjs";
 
 export default async function Home() {
 	const { userId } = await auth();
@@ -9,12 +10,22 @@ export default async function Home() {
 			<h1 className="text-3xl font-semibold">PrzeczytAI</h1>
 
 			{userId ? (
-				<Link
-					href="/protected"
-					className="rounded-md bg-black px-5 py-2.5 text-sm text-white hover:bg-zinc-700"
-				>
-					Go to protected page
-				</Link>
+				<div className="flex gap-4">
+					<Link
+						href="/protected"
+						className="rounded-md bg-black px-5 py-2.5 text-sm text-white hover:bg-zinc-700"
+					>
+						Go to protected page
+					</Link>
+					<SignOutButton>
+						<button
+							type="button"
+							className="rounded-md border border-black px-5 py-2.5 text-sm hover:bg-zinc-100"
+						>
+							Sign out
+						</button>
+					</SignOutButton>
+				</div>
 			) : (
 				<div className="flex gap-4">
 					<Link
