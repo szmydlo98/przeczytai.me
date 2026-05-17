@@ -110,6 +110,30 @@ class ReadingRepository:
             },
         )
 
+    def mark_completed(
+        self,
+        owner_user_id: str,
+        reading_id: str,
+        corrected_text_key: str,
+        recording_key: str,
+        metadata: dict[str, object],
+    ) -> None:
+        self.table.update_item(
+            Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"},
+            UpdateExpression=(
+                "SET #status = :status, corrected_text_key = :corrected_text_key, "
+                "recording_key = :recording_key, metadata = :metadata, updated_at = :updated_at"
+            ),
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={
+                ":status": "completed",
+                ":corrected_text_key": corrected_text_key,
+                ":recording_key": recording_key,
+                ":metadata": metadata,
+                ":updated_at": _now(),
+            },
+        )
+
     def list(
         self, owner_user_id: str, limit: int, cursor: str | None
     ) -> tuple[list[dict], str | None]:

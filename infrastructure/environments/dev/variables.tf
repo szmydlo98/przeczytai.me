@@ -53,6 +53,11 @@ variable "processor_lambda_memory_size" {
   default = 256
 }
 
+variable "processor_image_tag" {
+  type    = string
+  default = "latest"
+}
+
 variable "budget_limit_usd" {
   type    = number
   default = 8

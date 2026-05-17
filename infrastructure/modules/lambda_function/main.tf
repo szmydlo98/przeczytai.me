@@ -58,10 +58,12 @@ resource "aws_lambda_function" "this" {
   function_name    = var.function_name
   description      = var.description
   role             = aws_iam_role.this.arn
-  handler          = var.handler
-  runtime          = var.runtime
-  filename         = var.filename
-  source_code_hash = var.source_code_hash
+  package_type     = var.package_type
+  handler          = var.package_type == "Zip" ? var.handler : null
+  runtime          = var.package_type == "Zip" ? var.runtime : null
+  filename         = var.package_type == "Zip" ? var.filename : null
+  source_code_hash = var.package_type == "Zip" ? var.source_code_hash : null
+  image_uri        = var.package_type == "Image" ? var.image_uri : null
   timeout          = var.timeout
   memory_size      = var.memory_size
   tags             = merge(var.tags, { Name = var.function_name })

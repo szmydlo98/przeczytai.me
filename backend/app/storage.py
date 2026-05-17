@@ -27,13 +27,16 @@ class FileStorage:
         return self._key(owner_user_id, reading_id, f"recording.{extension}")
 
     def put_text(self, key: str, content: str, content_type: str) -> None:
+        self.put_bytes(key, content.encode(), content_type)
+
+    def put_bytes(self, key: str, content: bytes, content_type: str) -> None:
         if not self.s3 or not self.bucket_name:
             raise StorageConfigurationError("Files bucket is not configured")
         try:
             self.s3.put_object(
                 Bucket=self.bucket_name,
                 Key=key,
-                Body=content.encode(),
+                Body=content,
                 ContentType=content_type,
             )
         except (BotoCoreError, ClientError) as exc:

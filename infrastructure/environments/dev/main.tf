@@ -27,6 +27,12 @@ module "storage" {
   tags        = local.common_tags
 }
 
+resource "aws_ecr_repository" "processor" {
+  name         = "${local.name_prefix}-processor"
+  force_delete = true
+  tags         = merge(local.common_tags, { Name = "${local.name_prefix}-processor" })
+}
+
 module "api_lambda" {
   source = "../../modules/lambda_function"
 
@@ -80,14 +86,13 @@ module "api_lambda" {
 module "processor_lambda" {
   source = "../../modules/lambda_function"
 
-  function_name    = "${local.name_prefix}-processor"
-  description      = "Placeholder reading processor for przeczytai.me dev."
-  handler          = "app.processing.handler"
-  filename         = module.lambda_artifact.filename
-  source_code_hash = module.lambda_artifact.output_base64sha256
-  timeout          = var.processor_lambda_timeout_seconds
-  memory_size      = var.processor_lambda_memory_size
-  tags             = local.common_tags
+  function_name = "${local.name_prefix}-processor"
+  description   = "Reading audio processor for przeczytai.me dev."
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.processor.repository_url}:${var.processor_image_tag}"
+  timeout       = var.processor_lambda_timeout_seconds
+  memory_size   = var.processor_lambda_memory_size
+  tags          = local.common_tags
 
   environment_variables = {
     ENVIRONMENT         = var.environment

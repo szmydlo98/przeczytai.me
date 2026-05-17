@@ -7,6 +7,7 @@ from app.errors import ApiException
 from app.models import Reading, ReadingCreateRequest, ReadingListResponse
 from app.repositories.readings import ProcessingStartError, ReadingRepository
 from app.storage import FileStorage, StorageError
+from app.tts import TTS_VENDOR, TTS_VOICE
 
 router = APIRouter(prefix="/api/v1/readings", tags=["readings"])
 
@@ -71,8 +72,8 @@ async def create_reading(
             reading_id,
             original_text_key,
             len(original_text),
-            request.vendor,
-            request.voice,
+            TTS_VENDOR,
+            TTS_VOICE,
         )
     except ProcessingStartError as exc:
         raise ApiException(
@@ -128,7 +129,7 @@ async def download_recording(
     if not recording_key:
         raise ApiException("not_found", "Recording not found", 404)
     try:
-        url = storage.download_url(str(recording_key), f"{reading_id}-recording")
+        url = storage.download_url(str(recording_key), f"{reading_id}-recording.mp3")
     except StorageError as exc:
         raise ApiException("storage_error", "Failed to load recording", 500) from exc
     return RedirectResponse(url)

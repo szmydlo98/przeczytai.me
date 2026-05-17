@@ -8,7 +8,8 @@ variable "description" {
 }
 
 variable "handler" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "runtime" {
@@ -17,11 +18,28 @@ variable "runtime" {
 }
 
 variable "filename" {
-  type = string
+  type    = string
+  default = null
 }
 
 variable "source_code_hash" {
-  type = string
+  type    = string
+  default = null
+}
+
+variable "package_type" {
+  type    = string
+  default = "Zip"
+
+  validation {
+    condition     = contains(["Zip", "Image"], var.package_type)
+    error_message = "package_type must be either Zip or Image."
+  }
+}
+
+variable "image_uri" {
+  type    = string
+  default = null
 }
 
 variable "timeout" {

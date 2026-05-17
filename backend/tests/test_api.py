@@ -8,6 +8,7 @@ from app.config import Settings, get_settings
 from app.main import app
 from app.repositories.readings import ProcessingStartError
 from app.routes.readings import get_file_storage, get_reading_repository
+from app.tts import TTS_VENDOR, TTS_VOICE
 
 NOW = "2026-05-04T12:00:00Z"
 
@@ -60,6 +61,21 @@ class FakeRepo:
         self.deleted.append((owner_user_id, reading_id))
         self.items.pop((owner_user_id, reading_id), None)
 
+    def mark_completed(
+        self,
+        owner_user_id: str,
+        reading_id: str,
+        corrected_text_key: str,
+        recording_key: str,
+        metadata: dict[str, object],
+    ) -> None:
+        item = self.items[(owner_user_id, reading_id)]
+        item["corrected_text_key"] = corrected_text_key
+        item["recording_key"] = recording_key
+        item["metadata"] = metadata
+        item["status"] = "completed"
+        item["updated_at"] = NOW
+
 
 class FailingProcessingRepo(FakeRepo):
     def create(
@@ -91,6 +107,10 @@ class FakeStorage:
     def put_text(self, key: str, content: str, content_type: str) -> None:
         del content_type
         self.texts[key] = content
+
+    def put_bytes(self, key: str, content: bytes, content_type: str) -> None:
+        del content_type
+        self.texts[key] = content.decode()
 
     def get_text(self, key: str) -> str:
         return self.texts[key]
@@ -170,8 +190,8 @@ def test_create_and_get_reading() -> None:
     assert created["original_text_key"] == "users/user_1/readings/id-1/original.txt"
     assert created["corrected_text_key"] is None
     assert created["recording_key"] is None
-    assert created["vendor"] == "aws-polly"
-    assert created["voice"] == "Ola"
+    assert created["vendor"] == TTS_VENDOR
+    assert created["voice"] == TTS_VOICE
     assert created["status"] == "processing"
     assert created["char_count"] == 5
     assert storage.texts[created["original_text_key"]] == "hello"
@@ -279,7 +299,7 @@ def test_download_recording() -> None:
     assert response.headers["location"] == (
         "https://files.example/"
         f"users/user_1/readings/{item['reading_id']}/recording.mp3"
-        f"?filename={item['reading_id']}-recording"
+        f"?filename={item['reading_id']}-recording.mp3"
     )
 
 
