@@ -10,14 +10,6 @@ variable "lambda_invoke_arn" {
   type = string
 }
 
-variable "jwt_issuer" {
-  type = string
-}
-
-variable "jwt_audiences" {
-  type = list(string)
-}
-
 variable "allowed_origins" {
   type = list(string)
 }

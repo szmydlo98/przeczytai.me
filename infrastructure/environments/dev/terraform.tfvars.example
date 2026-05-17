@@ -1,6 +1,3 @@
-clerk_issuer = "https://your-clerk-issuer.example"
-
 # Defaults shown for clarity.
 allowed_origins  = ["http://localhost:3000"]
-clerk_audience   = "przeczytai-api"
 budget_limit_usd = 8

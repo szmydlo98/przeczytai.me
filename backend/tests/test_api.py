@@ -121,11 +121,12 @@ def client(
     repo: FakeRepo | None = None,
     auth: bool = True,
     storage: FakeStorage | None = None,
+    settings: Settings | None = None,
 ) -> tuple[TestClient, FakeRepo]:
     app.dependency_overrides.clear()
     repo = repo or FakeRepo()
     storage = storage or FakeStorage()
-    app.dependency_overrides[get_settings] = lambda: Settings(max_text_chars=10)
+    app.dependency_overrides[get_settings] = lambda: settings or Settings(max_text_chars=10)
     app.dependency_overrides[get_reading_repository] = lambda: repo
     app.dependency_overrides[get_file_storage] = lambda: storage
     if auth:
@@ -294,10 +295,23 @@ def test_download_recording_missing_returns_404() -> None:
     assert response.json()["error"]["code"] == "not_found"
 
 
-def test_missing_jwt_returns_401() -> None:
-    """Reject protected endpoints without JWT claims."""
+def test_missing_jwt_uses_unauthenticated_user_when_auth_is_disabled() -> None:
+    """Use the configured public user id when JWT auth is disabled."""
     test_client, _ = client(auth=False)
+    response = test_client.post("/api/v1/readings", json={"original_text": "hello"})
+
+    assert response.status_code == 202
+    assert response.json()["original_text_key"] == "users/anonymous/readings/id-1/original.txt"
+
+
+def test_missing_jwt_returns_401_when_auth_is_required() -> None:
+    """Reject protected endpoints without JWT claims when auth is enabled."""
+    test_client, _ = client(
+        auth=False,
+        settings=Settings(max_text_chars=10, auth_required=True),
+    )
     response = test_client.get("/api/v1/readings")
+
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "unauthorized"
 

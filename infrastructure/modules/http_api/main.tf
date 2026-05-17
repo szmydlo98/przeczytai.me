@@ -47,32 +47,16 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.this.id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "${var.api_name}-jwt"
-
-  jwt_configuration {
-    audience = var.jwt_audiences
-    issuer   = var.jwt_issuer
-  }
+resource "aws_apigatewayv2_route" "readings" {
+  api_id    = aws_apigatewayv2_api.this.id
+  route_key = "ANY /api/v1/readings"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
-resource "aws_apigatewayv2_route" "protected_textcordings" {
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "ANY /api/v1/textcordings"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
-}
-
-resource "aws_apigatewayv2_route" "protected_textcording_proxy" {
-  api_id             = aws_apigatewayv2_api.this.id
-  route_key          = "ANY /api/v1/textcordings/{proxy+}"
-  authorization_type = "JWT"
-  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+resource "aws_apigatewayv2_route" "reading_proxy" {
+  api_id    = aws_apigatewayv2_api.this.id
+  route_key = "ANY /api/v1/readings/{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
 resource "aws_apigatewayv2_route" "public_health" {

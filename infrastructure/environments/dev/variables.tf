@@ -28,16 +28,6 @@ variable "allowed_origins" {
   default = ["http://localhost:3000"]
 }
 
-variable "clerk_issuer" {
-  type        = string
-  description = "OIDC issuer URL used by API Gateway JWT auth."
-}
-
-variable "clerk_audience" {
-  type    = string
-  default = "przeczytai-api"
-}
-
 variable "max_text_chars" {
   type    = number
   default = 100000

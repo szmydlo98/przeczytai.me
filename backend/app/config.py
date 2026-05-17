@@ -5,14 +5,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", populate_by_name=True)
 
+    auth_required: bool = Field(default=False, validation_alias="AUTH_REQUIRED")
+    unauthenticated_user_id: str = Field(
+        default="anonymous",
+        validation_alias="UNAUTHENTICATED_USER_ID",
+    )
     max_text_chars: int = 100_000
     readings_table_name: str = Field(
         default="local-readings",
         validation_alias=AliasChoices(
             "READINGS_TABLE_NAME",
-            "TEXTCORDINGS_TABLE_NAME",
             "TEXTS_TABLE_NAME",
         ),
     )
