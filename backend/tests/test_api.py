@@ -5,6 +5,7 @@ from starlette.requests import Request
 
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
+from app import main
 from app.main import app
 from app.repositories.readings import ProcessingStartError
 from app.routes.readings import get_file_storage, get_reading_repository
@@ -146,18 +147,50 @@ def client(
     app.dependency_overrides.clear()
     repo = repo or FakeRepo()
     storage = storage or FakeStorage()
-    app.dependency_overrides[get_settings] = lambda: settings or Settings(max_text_chars=10)
+    settings = settings or Settings(max_text_chars=10, api_key="test-api-key")
+    app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_reading_repository] = lambda: repo
     app.dependency_overrides[get_file_storage] = lambda: storage
     if auth:
         app.dependency_overrides[get_current_user] = lambda: CurrentUser("user_1")
-    return TestClient(app), repo
+    return TestClient(app, headers={"x-api-key": settings.api_key or ""}), repo
 
 
 def test_health() -> None:
     """Return ok from the public health endpoint."""
     test_client, _ = client()
     assert test_client.get("/api/v1/health").json() == {"status": "ok"}
+
+
+def test_missing_api_key_returns_401() -> None:
+    """Reject requests without the shared API key when configured."""
+    app.dependency_overrides.clear()
+    original_get_middleware_settings = main.get_middleware_settings
+    main.get_middleware_settings = lambda: Settings(api_key="test-api-key")
+    test_client = TestClient(app)
+
+    try:
+        response = test_client.get("/api/v1/health")
+    finally:
+        main.get_middleware_settings = original_get_middleware_settings
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "unauthorized"
+
+
+def test_docs_do_not_require_api_key() -> None:
+    """Keep interactive docs public for browser access."""
+    app.dependency_overrides.clear()
+    original_get_middleware_settings = main.get_middleware_settings
+    main.get_middleware_settings = lambda: Settings(api_key="test-api-key")
+    test_client = TestClient(app)
+
+    try:
+        assert test_client.get("/docs").status_code == 200
+        assert test_client.get("/redoc").status_code == 200
+        assert test_client.get("/openapi.json").status_code == 200
+    finally:
+        main.get_middleware_settings = original_get_middleware_settings
 
 
 def test_create_rejects_empty_original_text() -> None:

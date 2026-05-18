@@ -33,6 +33,12 @@ variable "max_text_chars" {
   default = 100000
 }
 
+variable "api_key" {
+  type        = string
+  description = "Shared x-api-key value required by the API."
+  sensitive   = true
+}
+
 variable "api_lambda_timeout_seconds" {
   type    = number
   default = 20

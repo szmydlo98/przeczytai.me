@@ -48,6 +48,7 @@ module "api_lambda" {
   environment_variables = {
     ENVIRONMENT             = var.environment
     AUTH_REQUIRED           = "false"
+    API_KEY                 = var.api_key
     FILES_BUCKET_NAME       = module.storage.files_bucket_name
     MAX_TEXT_CHARS          = tostring(var.max_text_chars)
     PROCESSOR_FUNCTION_NAME = module.processor_lambda.function_name

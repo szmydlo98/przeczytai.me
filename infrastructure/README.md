@@ -33,6 +33,15 @@ terraform -chdir=infrastructure/environments/dev init
 terraform -chdir=infrastructure/environments/dev apply
 ```
 
+The API requires a shared `x-api-key` header for application endpoints. Docs
+remain public at `/docs`, `/redoc`, and `/openapi.json`. Set `api_key` in
+`infrastructure/environments/dev/terraform.tfvars`, and use the same value when
+running API Gateway tests:
+
+```bash
+API_KEY="your-dev-key" python3 -m pytest tests/api_gateway
+```
+
 The dev backend stores state at `environments/dev/terraform.tfstate`.
 
 The processor Lambda is deployed from an ECR image. On the first deploy, create

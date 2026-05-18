@@ -30,15 +30,31 @@ def api_base_url() -> str:
     return result.stdout.strip().rstrip("/")
 
 
+@pytest.fixture(scope="session")
+def api_key() -> str:
+    key = os.getenv("API_KEY")
+    if not key:
+        pytest.skip("Set API_KEY to run API Gateway tests against the protected API.")
+    return key
+
+
 @pytest.fixture
-def api_client(api_base_url: str) -> httpx.Client:
-    with httpx.Client(base_url=api_base_url, timeout=60.0) as client:
+def api_client(api_base_url: str, api_key: str) -> httpx.Client:
+    with httpx.Client(
+        base_url=api_base_url,
+        headers={"x-api-key": api_key},
+        timeout=60.0,
+    ) as client:
         yield client
 
 
 @pytest.fixture(scope="session")
-def completed_reading(api_base_url: str) -> dict[str, Any]:
-    with httpx.Client(base_url=api_base_url, timeout=60.0) as client:
+def completed_reading(api_base_url: str, api_key: str) -> dict[str, Any]:
+    with httpx.Client(
+        base_url=api_base_url,
+        headers={"x-api-key": api_key},
+        timeout=60.0,
+    ) as client:
         created = create_reading(client)
         completed = wait_for_completed(client, created["id"])
         completed["submitted_text"] = created["submitted_text"]

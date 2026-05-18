@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import Depends, Request
 
 from app.config import Settings, get_settings
@@ -7,6 +9,15 @@ from app.errors import ApiException
 class CurrentUser:
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
+
+
+def require_api_key(request: Request, settings: Settings) -> None:
+    if not settings.api_key:
+        return
+
+    provided_key = request.headers.get("x-api-key")
+    if not provided_key or not secrets.compare_digest(provided_key, settings.api_key):
+        raise ApiException("unauthorized", "Invalid API key", 401)
 
 
 async def get_current_user(

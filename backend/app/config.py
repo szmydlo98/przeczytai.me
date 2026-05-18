@@ -12,6 +12,7 @@ class Settings(BaseSettings):
         default="anonymous",
         validation_alias="UNAUTHENTICATED_USER_ID",
     )
+    api_key: str | None = Field(default=None, validation_alias="API_KEY")
     max_text_chars: int = 100_000
     readings_table_name: str = Field(
         default="local-readings",
