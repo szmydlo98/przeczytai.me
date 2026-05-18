@@ -40,7 +40,7 @@ the repository before pushing the image:
 
 ```bash
 terraform -chdir=infrastructure/environments/dev apply -target=aws_ecr_repository.processor
-scripts/build-push-processor-image.sh
+backend/scripts/build-push-processor-image.sh
 terraform -chdir=infrastructure/environments/dev apply
 ```
 

@@ -10,6 +10,14 @@ from app.storage import FileStorage, StorageError
 from app.tts import TTS_VENDOR, TTS_VOICE
 
 router = APIRouter(prefix="/api/v1/readings", tags=["readings"])
+REQUIRED_READING_FIELDS = {
+    "reading_id",
+    "original_text_key",
+    "status",
+    "char_count",
+    "created_at",
+    "updated_at",
+}
 
 
 def get_reading_repository(settings: Settings = Depends(get_settings)) -> ReadingRepository:
@@ -36,13 +44,17 @@ def _reading(item: dict) -> Reading:
     )
 
 
+def _is_reading_item(item: dict) -> bool:
+    return all(item.get(field) is not None for field in REQUIRED_READING_FIELDS)
+
+
 def _get_user_reading(
     owner_user_id: str,
     reading_id: str,
     repo: ReadingRepository,
 ) -> dict:
     item = repo.get(owner_user_id, reading_id)
-    if not item:
+    if not item or not _is_reading_item(item):
         raise ApiException("not_found", "Reading not found", 404)
     return item
 
@@ -93,7 +105,7 @@ async def list_readings(
 ) -> ReadingListResponse:
     items, next_cursor = repo.list(user.user_id, limit, cursor)
     return ReadingListResponse(
-        items=[_reading(item) for item in items],
+        items=[_reading(item) for item in items if _is_reading_item(item)],
         next_cursor=next_cursor,
     )
 

@@ -221,6 +221,23 @@ def test_list_is_user_scoped() -> None:
     assert [item["id"] for item in response["items"]] == ["id-1"]
 
 
+def test_list_skips_malformed_reading_items() -> None:
+    """Skip partial rows left by asynchronous processing races."""
+    repo = FakeRepo()
+    add_reading(repo, "user_1", "mine")
+    repo.items[("user_1", "bad")] = {
+        "pk": "USER#user_1",
+        "sk": "READING#bad",
+        "status": "completed",
+    }
+    test_client, _ = client(repo)
+
+    response = test_client.get("/api/v1/readings")
+
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == ["id-1"]
+
+
 def test_get_missing_returns_404() -> None:
     """Return not found for a missing reading id."""
     test_client, _ = client()

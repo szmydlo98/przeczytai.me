@@ -118,21 +118,27 @@ class ReadingRepository:
         recording_key: str,
         metadata: dict[str, object],
     ) -> None:
-        self.table.update_item(
-            Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"},
-            UpdateExpression=(
-                "SET #status = :status, corrected_text_key = :corrected_text_key, "
-                "recording_key = :recording_key, metadata = :metadata, updated_at = :updated_at"
-            ),
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": "completed",
-                ":corrected_text_key": corrected_text_key,
-                ":recording_key": recording_key,
-                ":metadata": metadata,
-                ":updated_at": _now(),
-            },
-        )
+        try:
+            self.table.update_item(
+                Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"},
+                UpdateExpression=(
+                    "SET #status = :status, corrected_text_key = :corrected_text_key, "
+                    "recording_key = :recording_key, metadata = :metadata, updated_at = :updated_at"
+                ),
+                ConditionExpression="attribute_exists(reading_id)",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":status": "completed",
+                    ":corrected_text_key": corrected_text_key,
+                    ":recording_key": recording_key,
+                    ":metadata": metadata,
+                    ":updated_at": _now(),
+                },
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return
+            raise
 
     def list(
         self, owner_user_id: str, limit: int, cursor: str | None
