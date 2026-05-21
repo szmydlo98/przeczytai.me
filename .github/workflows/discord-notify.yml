@@ -1,8 +1,6 @@
 name: Discord Notifications
 
 on:
-  push:
-    branches: [main]
   pull_request:
     types: [opened, closed]
 
@@ -16,52 +14,43 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          EVENT="${{ github.event_name }}"
           ACTOR="${{ github.actor }}"
           ACTOR_URL="https://github.com/${{ github.actor }}"
           AVATAR_URL="https://github.com/${{ github.actor }}.png"
 
-          if [ "$EVENT" = "push" ]; then
-            BRANCH="${{ github.ref_name }}"
-            COMMIT_SHA="${{ github.sha }}"
-            SHORT_SHA="${COMMIT_SHA:0:7}"
-            COMMIT_MSG="${{ github.event.head_commit.message }}"
-            COMMIT_URL="${{ github.event.head_commit.url }}"
-            COMMIT_COUNT="${{ github.event.commits.length }}"
-            TITLE="Push to \`${BRANCH}\`"
-            DESCRIPTION="$(printf '[\`%s\`](%s) %s' "$SHORT_SHA" "$COMMIT_URL" "$COMMIT_MSG")"
-            STATS="$(printf '```ansi\n\033[33m%s commit(s)\033[0m\n```' "$COMMIT_COUNT")"
-            COLOR=3447003
-          fi
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          PR_ACTION="${{ github.event.action }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          ADDITIONS="${{ github.event.pull_request.additions }}"
+          DELETIONS="${{ github.event.pull_request.deletions }}"
+          CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
+          STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
 
-          if [ "$EVENT" = "pull_request" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_URL="${{ github.event.pull_request.html_url }}"
-            PR_ACTION="${{ github.event.action }}"
-            BRANCH="${{ github.event.pull_request.head.ref }}"
-            ADDITIONS="${{ github.event.pull_request.additions }}"
-            DELETIONS="${{ github.event.pull_request.deletions }}"
-            CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
-            STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
-            DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
-
-            case "$PR_ACTION" in
-              opened)
-                TITLE="PR #${PR_NUMBER} opened"
-                COLOR=5763719
-                ;;
-              closed)
-                if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
-                  TITLE="PR #${PR_NUMBER} merged"
-                  COLOR=11027200
+          case "$PR_ACTION" in
+            opened)
+              TITLE="PR #${PR_NUMBER} opened"
+              DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+              COLOR=5763719
+              ;;
+            closed)
+              if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+                TITLE="PR #${PR_NUMBER} merged"
+                COLOR=11027200
+                if [ -n "$PR_BODY" ]; then
+                  DESCRIPTION="$(printf '[%s](%s)\n`%s`\n\n%s' "$PR_TITLE" "$PR_URL" "$BRANCH" "$PR_BODY")"
                 else
-                  TITLE="PR #${PR_NUMBER} closed"
-                  COLOR=15548997
+                  DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
                 fi
-                ;;
-            esac
-          fi
+              else
+                TITLE="PR #${PR_NUMBER} closed"
+                DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+                COLOR=15548997
+              fi
+              ;;
+          esac
 
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
