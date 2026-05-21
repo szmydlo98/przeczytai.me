@@ -1,0 +1,101 @@
+name: Discord Notifications
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, closed, reopened, synchronize]
+
+jobs:
+  notify:
+    name: Send Discord notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build and send Discord message
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          EVENT="${{ github.event_name }}"
+          ACTOR="${{ github.actor }}"
+          ACTOR_URL="https://github.com/${{ github.actor }}"
+          AVATAR_URL="https://github.com/${{ github.actor }}.png"
+
+          if [ "$EVENT" = "push" ]; then
+            BRANCH="${{ github.ref_name }}"
+            COMMIT_SHA="${{ github.sha }}"
+            SHORT_SHA="${COMMIT_SHA:0:7}"
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            COMMIT_URL="${{ github.event.head_commit.url }}"
+            COMMIT_COUNT="${{ github.event.commits.length }}"
+            TITLE="Push to \`${BRANCH}\`"
+            DESCRIPTION="$(printf '[\`%s\`](%s) %s' "$SHORT_SHA" "$COMMIT_URL" "$COMMIT_MSG")"
+            STATS="$(printf '```ansi\n\033[33m%s commit(s)\033[0m\n```' "$COMMIT_COUNT")"
+            COLOR=3447003
+          fi
+
+          if [ "$EVENT" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.pull_request.html_url }}"
+            PR_ACTION="${{ github.event.action }}"
+            BRANCH="${{ github.event.pull_request.head.ref }}"
+            ADDITIONS="${{ github.event.pull_request.additions }}"
+            DELETIONS="${{ github.event.pull_request.deletions }}"
+            CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
+            STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
+            DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+
+            case "$PR_ACTION" in
+              opened)
+                TITLE="PR #${PR_NUMBER} opened"
+                COLOR=5763719
+                ;;
+              closed)
+                if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+                  TITLE="PR #${PR_NUMBER} merged"
+                  COLOR=11027200
+                else
+                  TITLE="PR #${PR_NUMBER} closed"
+                  COLOR=15548997
+                fi
+                ;;
+              reopened)
+                TITLE="PR #${PR_NUMBER} reopened"
+                COLOR=16776960
+                ;;
+              synchronize)
+                TITLE="PR #${PR_NUMBER} updated"
+                COLOR=3447003
+                ;;
+            esac
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg description "$DESCRIPTION" \
+            --arg stats "$STATS" \
+            --argjson color "$COLOR" \
+            --arg actor "$ACTOR" \
+            --arg actor_url "$ACTOR_URL" \
+            --arg avatar_url "$AVATAR_URL" \
+            '{
+              username: "Github PRs",
+              avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              embeds: [{
+                title: $title,
+                description: $description,
+                color: $color,
+                fields: [{
+                  name: "Changes",
+                  value: $stats,
+                  inline: true
+                }],
+                author: { name: $actor, url: $actor_url, icon_url: $avatar_url }
+              }]
+            }')
+
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK_URL"
