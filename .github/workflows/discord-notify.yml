@@ -28,8 +28,10 @@ jobs:
             SHORT_SHA="${COMMIT_SHA:0:7}"
             COMMIT_MSG="${{ github.event.head_commit.message }}"
             COMMIT_URL="${{ github.event.head_commit.url }}"
+            COMMIT_COUNT="${{ github.event.commits.length }}"
             TITLE="Push to \`${BRANCH}\`"
             DESCRIPTION="[\`${SHORT_SHA}\`](${COMMIT_URL}) ${COMMIT_MSG}"
+            STATS="\`${COMMIT_COUNT}\` commit(s)"
             COLOR=3447003
           fi
 
@@ -39,6 +41,10 @@ jobs:
             PR_URL="${{ github.event.pull_request.html_url }}"
             PR_ACTION="${{ github.event.action }}"
             BRANCH="${{ github.event.pull_request.head.ref }}"
+            ADDITIONS="${{ github.event.pull_request.additions }}"
+            DELETIONS="${{ github.event.pull_request.deletions }}"
+            CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
+            STATS="\`+${ADDITIONS}\` / \`-${DELETIONS}\` in \`${CHANGED_FILES}\` file(s)"
 
             case "$PR_ACTION" in
               opened)
@@ -70,10 +76,19 @@ jobs:
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Content-Type: application/json" \
             -d "{
+              \"username\": \"przeczytai.me\",
+              \"avatar_url\": \"https://avatars.githubusercontent.com/u/szmydlo98\",
               \"embeds\": [{
                 \"title\": \"${TITLE}\",
                 \"description\": \"${DESCRIPTION}\",
                 \"color\": ${COLOR},
+                \"fields\": [
+                  {
+                    \"name\": \"Changes\",
+                    \"value\": \"${STATS}\",
+                    \"inline\": true
+                  }
+                ],
                 \"footer\": {
                   \"text\": \"${REPO}\",
                   \"icon_url\": \"${AVATAR_URL}\"
