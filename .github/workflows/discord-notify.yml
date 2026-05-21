@@ -13,40 +13,40 @@ jobs:
       - name: Build and send Discord message
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_ADDITIONS: ${{ github.event.pull_request.additions }}
+          PR_DELETIONS: ${{ github.event.pull_request.deletions }}
+          PR_CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+          ACTOR: ${{ github.actor }}
+          ACTOR_URL: https://github.com/${{ github.actor }}
+          AVATAR_URL: https://github.com/${{ github.actor }}.png
         run: |
-          ACTOR="${{ github.actor }}"
-          ACTOR_URL="https://github.com/${{ github.actor }}"
-          AVATAR_URL="https://github.com/${{ github.actor }}.png"
-
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_URL="${{ github.event.pull_request.html_url }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
-          PR_ACTION="${{ github.event.action }}"
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          ADDITIONS="${{ github.event.pull_request.additions }}"
-          DELETIONS="${{ github.event.pull_request.deletions }}"
-          CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
-          STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
+          STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$PR_ADDITIONS" "$PR_DELETIONS" "$PR_CHANGED_FILES")"
 
           case "$PR_ACTION" in
             opened)
               TITLE="PR #${PR_NUMBER} opened"
-              DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+              DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$PR_BRANCH")"
               COLOR=5763719
               ;;
             closed)
-              if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+              if [ "$PR_MERGED" = "true" ]; then
                 TITLE="PR #${PR_NUMBER} merged"
                 COLOR=11027200
                 if [ -n "$PR_BODY" ]; then
-                  DESCRIPTION="$(printf '[%s](%s)\n`%s`\n\n%s' "$PR_TITLE" "$PR_URL" "$BRANCH" "$PR_BODY")"
+                  DESCRIPTION="$(printf '[%s](%s)\n`%s`\n\n%s' "$PR_TITLE" "$PR_URL" "$PR_BRANCH" "$PR_BODY")"
                 else
-                  DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+                  DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$PR_BRANCH")"
                 fi
               else
                 TITLE="PR #${PR_NUMBER} closed"
-                DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
+                DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$PR_BRANCH")"
                 COLOR=15548997
               fi
               ;;
