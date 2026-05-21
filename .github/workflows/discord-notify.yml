@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, closed, reopened, synchronize]
+    types: [opened, closed]
 
 jobs:
   notify:
@@ -59,14 +59,6 @@ jobs:
                   TITLE="PR #${PR_NUMBER} closed"
                   COLOR=15548997
                 fi
-                ;;
-              reopened)
-                TITLE="PR #${PR_NUMBER} reopened"
-                COLOR=16776960
-                ;;
-              synchronize)
-                TITLE="PR #${PR_NUMBER} updated"
-                COLOR=3447003
                 ;;
             esac
           fi
