@@ -30,7 +30,7 @@ const QUERY_IN_PROGRESS = `
 
 // completedAt >= $after guards against returning all ever-completed issues.
 const QUERY_COMPLETED = `
-  query CompletedIssues($after: DateTime!) {
+  query CompletedIssues($after: DateTimeOrDuration!) {
     issues(
       filter: {
         completedAt: { gte: $after }
@@ -61,7 +61,8 @@ async function linearFetch(query, variables = {}) {
   });
 
   if (!res.ok) {
-    throw new Error(`Linear API responded with ${res.status} ${res.statusText}`);
+    const body = await res.text();
+    throw new Error(`Linear API responded with ${res.status} ${res.statusText}: ${body}`);
   }
 
   const json = await res.json();
