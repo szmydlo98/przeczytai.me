@@ -31,7 +31,7 @@ jobs:
             COMMIT_COUNT="${{ github.event.commits.length }}"
             TITLE="Push to \`${BRANCH}\`"
             DESCRIPTION="[\`${SHORT_SHA}\`](${COMMIT_URL}) ${COMMIT_MSG}"
-            STATS="\`${COMMIT_COUNT}\` commit(s)"
+            STATS="$(printf '```ansi\n\033[33m%s commit(s)\033[0m\n```' "$COMMIT_COUNT")"
             COLOR=3447003
           fi
 
@@ -44,7 +44,7 @@ jobs:
             ADDITIONS="${{ github.event.pull_request.additions }}"
             DELETIONS="${{ github.event.pull_request.deletions }}"
             CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
-            STATS="\`+${ADDITIONS}\` / \`-${DELETIONS}\` in \`${CHANGED_FILES}\` file(s)"
+            STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
 
             case "$PR_ACTION" in
               opened)
@@ -73,31 +73,33 @@ jobs:
             DESCRIPTION="[${PR_TITLE}](${PR_URL})\n\`${BRANCH}\`"
           fi
 
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg description "$DESCRIPTION" \
+            --arg stats "$STATS" \
+            --argjson color "$COLOR" \
+            --arg actor "$ACTOR" \
+            --arg actor_url "$ACTOR_URL" \
+            --arg avatar_url "$AVATAR_URL" \
+            --arg repo "$REPO" \
+            '{
+              username: "Github PRs",
+              avatar_url: "https://avatars.githubusercontent.com/szmydlo98",
+              embeds: [{
+                title: $title,
+                description: $description,
+                color: $color,
+                fields: [{
+                  name: "Changes",
+                  value: $stats,
+                  inline: true
+                }],
+                footer: { text: $repo, icon_url: $avatar_url },
+                author: { name: $actor, url: $actor_url, icon_url: $avatar_url }
+              }]
+            }')
+
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"username\": \"przeczytai.me\",
-              \"avatar_url\": \"https://avatars.githubusercontent.com/u/szmydlo98\",
-              \"embeds\": [{
-                \"title\": \"${TITLE}\",
-                \"description\": \"${DESCRIPTION}\",
-                \"color\": ${COLOR},
-                \"fields\": [
-                  {
-                    \"name\": \"Changes\",
-                    \"value\": \"${STATS}\",
-                    \"inline\": true
-                  }
-                ],
-                \"footer\": {
-                  \"text\": \"${REPO}\",
-                  \"icon_url\": \"${AVATAR_URL}\"
-                },
-                \"author\": {
-                  \"name\": \"${ACTOR}\",
-                  \"url\": \"${ACTOR_URL}\",
-                  \"icon_url\": \"${AVATAR_URL}\"
-                }
-              }]
-            }" \
+            -d "$PAYLOAD" \
             "$DISCORD_WEBHOOK_URL"
