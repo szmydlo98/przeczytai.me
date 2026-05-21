@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# przeczytai.me
 
-## Getting Started
+**Live:** [przeczytai-me.vercel.app](https://przeczytai-me.vercel.app)
 
-First, run the development server:
+Text-to-speech web app for the Polish language. Paste or type any Polish text and have it read aloud.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Tech stack
+
+- **Next.js 16** — App Router, TypeScript
+- **Tailwind CSS** + **shadcn/ui** — styling and components
+- **Clerk** — authentication
+- **TanStack Query** — data fetching
+- **Biome** — linting and formatting
+- **Vercel** — deployment
+
+## Project structure
+
+```
+/
+├── frontend/       # Next.js app
+│   ├── src/
+│   │   ├── app/        # Routes and layouts
+│   │   ├── components/ # Shared components
+│   │   └── lib/        # Utilities and config
+│   └── public/
+└── docs/           # Architecture and decision notes
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Running locally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Prerequisites:** Node.js 18+, pnpm
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# 1. Clone the repo
+git clone https://github.com/szmydlo98/przeczytai.me.git
+cd przeczytai.me/frontend
 
-## Learn More
+# 2. Install dependencies
+pnpm install
 
-To learn more about Next.js, take a look at the following resources:
+# 3. Set up environment variables
+cp .env.local.example .env.local
+# Fill in your Clerk keys in .env.local
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# 4. Start the dev server
+pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy on Vercel
+### Environment variables
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key (`pk_test_...`) |
+| `CLERK_SECRET_KEY` | Clerk secret key (`sk_test_...`) |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Sign-in route (default: `/sign-in`) |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Sign-up route (default: `/sign-up`) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Get your Clerk keys at [dashboard.clerk.com](https://dashboard.clerk.com).
+
+## Useful commands
+
+```bash
+pnpm dev        # Start dev server
+pnpm build      # Production build
+pnpm lint       # Run Biome linter
+pnpm lint:fix   # Fix lint issues automatically
+pnpm format     # Format all files
+```
+
+## Deployment
+
+The app is deployed on [Vercel](https://vercel.com). Every push to `main` triggers a production deployment. PRs get a preview deployment automatically.
+
+Vercel is configured to use `frontend/` as the root directory (set in project Settings → General → Root Directory).
