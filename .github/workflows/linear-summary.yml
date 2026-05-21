@@ -1,0 +1,28 @@
+name: Linear Daily Summary
+
+on:
+  schedule:
+    # 7:00 UTC = 8:00 Warsaw winter (UTC+1) / 9:00 Warsaw summer (UTC+2).
+    # Accepts a ~1 h drift in summer to avoid running two overlapping crons.
+    - cron: "0 7 * * *"
+  workflow_dispatch: # Allow manual runs from the Actions tab
+
+jobs:
+  post-summary:
+    name: Fetch Linear issues and post to Discord
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Post summary
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DISCORD_WEBHOOK_URL_LINEAR: ${{ secrets.DISCORD_WEBHOOK_URL_LINEAR }}
+        run: node .github/scripts/linear-summary.js

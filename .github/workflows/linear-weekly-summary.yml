@@ -1,0 +1,27 @@
+name: Linear Weekly Summary
+
+on:
+  schedule:
+    # Every Monday at 7:00 UTC = 8:00 Warsaw winter (UTC+1) / 9:00 Warsaw summer (UTC+2).
+    - cron: "0 7 * * 1"
+  workflow_dispatch: # Allow manual runs from the Actions tab
+
+jobs:
+  post-weekly-summary:
+    name: Fetch Linear weekly stats and post to Discord
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Post weekly summary
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          DISCORD_WEBHOOK_URL_LINEAR: ${{ secrets.DISCORD_WEBHOOK_URL_LINEAR }}
+        run: node .github/scripts/linear-weekly-summary.js
