@@ -17,7 +17,6 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           EVENT="${{ github.event_name }}"
-          REPO="${{ github.repository }}"
           ACTOR="${{ github.actor }}"
           ACTOR_URL="https://github.com/${{ github.actor }}"
           AVATAR_URL="https://github.com/${{ github.actor }}.png"
@@ -30,7 +29,7 @@ jobs:
             COMMIT_URL="${{ github.event.head_commit.url }}"
             COMMIT_COUNT="${{ github.event.commits.length }}"
             TITLE="Push to \`${BRANCH}\`"
-            DESCRIPTION="[\`${SHORT_SHA}\`](${COMMIT_URL}) ${COMMIT_MSG}"
+            DESCRIPTION="$(printf '[\`%s\`](%s) %s' "$SHORT_SHA" "$COMMIT_URL" "$COMMIT_MSG")"
             STATS="$(printf '```ansi\n\033[33m%s commit(s)\033[0m\n```' "$COMMIT_COUNT")"
             COLOR=3447003
           fi
@@ -45,6 +44,7 @@ jobs:
             DELETIONS="${{ github.event.pull_request.deletions }}"
             CHANGED_FILES="${{ github.event.pull_request.changed_files }}"
             STATS="$(printf '```ansi\n\033[32m+%s\033[0m / \033[31m-%s\033[0m in %s file(s)\n```' "$ADDITIONS" "$DELETIONS" "$CHANGED_FILES")"
+            DESCRIPTION="$(printf '[%s](%s)\n`%s`' "$PR_TITLE" "$PR_URL" "$BRANCH")"
 
             case "$PR_ACTION" in
               opened)
@@ -69,8 +69,6 @@ jobs:
                 COLOR=3447003
                 ;;
             esac
-
-            DESCRIPTION="[${PR_TITLE}](${PR_URL})\n\`${BRANCH}\`"
           fi
 
           PAYLOAD=$(jq -n \
@@ -81,10 +79,9 @@ jobs:
             --arg actor "$ACTOR" \
             --arg actor_url "$ACTOR_URL" \
             --arg avatar_url "$AVATAR_URL" \
-            --arg repo "$REPO" \
             '{
               username: "Github PRs",
-              avatar_url: "https://avatars.githubusercontent.com/szmydlo98",
+              avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
               embeds: [{
                 title: $title,
                 description: $description,
@@ -94,7 +91,6 @@ jobs:
                   value: $stats,
                   inline: true
                 }],
-                footer: { text: $repo, icon_url: $avatar_url },
                 author: { name: $actor, url: $actor_url, icon_url: $avatar_url }
               }]
             }')
