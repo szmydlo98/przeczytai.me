@@ -12,7 +12,7 @@ if (!LINEAR_API_KEY || !DISCORD_WEBHOOK_URL) {
 const since7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
 const QUERY_CREATED = `
-  query CreatedIssues($after: DateTime!) {
+  query CreatedIssues($after: DateTimeOrDuration!) {
     issues(
       filter: { createdAt: { gte: $after } }
       first: 100
@@ -32,7 +32,7 @@ const QUERY_CREATED = `
 
 // completedAt >= $after prevents returning all ever-completed issues.
 const QUERY_RESOLVED = `
-  query ResolvedIssues($after: DateTime!) {
+  query ResolvedIssues($after: DateTimeOrDuration!) {
     issues(
       filter: {
         completedAt: { gte: $after }
