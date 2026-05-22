@@ -1,4 +1,5 @@
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
@@ -21,7 +22,7 @@ async def api_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
-async def validation_exception_handler(_: Request, __: Exception) -> JSONResponse:
+async def validation_exception_handler(_: Request, __: RequestValidationError) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content={"error": {"code": "validation_error", "message": "Invalid request"}},
