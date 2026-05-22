@@ -17,6 +17,7 @@
 # python
 __pycache__/
 *.py[cod]
+__init__.py
 
 # next.js
 /.next/
