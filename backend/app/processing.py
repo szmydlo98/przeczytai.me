@@ -60,6 +60,5 @@ async def process_reading(
     return {"status": "completed"}
 
 
-def handler(event: dict[str, Any], context: Any) -> dict[str, str]:
-    del context
+def handler(event: dict[str, Any], _context: Any) -> dict[str, str]:
     return asyncio.run(process_reading(event))
