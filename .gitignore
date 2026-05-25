@@ -15,6 +15,12 @@ node_modules
 !.yarn/versions
 
 # testing
+**/tests/report_*
+
+# python
+__pycache__/
+*.py[cod]
+__init__.py
 coverage
 
 # next.js
@@ -37,6 +43,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.local.example
+infrastructure/environments/dev/processor.auto.tfvars.json
 
 # vercel
 .vercel

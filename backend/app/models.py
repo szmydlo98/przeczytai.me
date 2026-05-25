@@ -1,0 +1,35 @@
+from pydantic import BaseModel, Field
+
+
+class ApiError(BaseModel):
+    code: str
+    message: str
+
+
+class ErrorResponse(BaseModel):
+    error: ApiError
+
+
+class ReadingCreateRequest(BaseModel):
+    original_text: str
+    vendor: str | None = Field(default=None, max_length=120)
+    voice: str | None = Field(default=None, max_length=120)
+
+
+class Reading(BaseModel):
+    id: str
+    original_text_key: str
+    corrected_text_key: str | None = None
+    recording_key: str | None = None
+    vendor: str | None = None
+    voice: str | None = None
+    status: str
+    metadata: dict[str, object] = Field(default_factory=dict)
+    char_count: int
+    created_at: str
+    updated_at: str
+
+
+class ReadingListResponse(BaseModel):
+    items: list[Reading]
+    next_cursor: str | None = None
