@@ -58,20 +58,12 @@ class ReadingRepository:
         }
 
         self.table.put_item(Item=item)
-        try:
-            self._start_processing(owner_user_id, reading_id, original_text_key)
-        except ProcessingStartError:
-            self._mark_processing_start_failed(owner_user_id, reading_id)
-            item["status"] = "failed_to_start"
-            item["metadata"] = {"processing_start_error": "lambda_invoke_failed"}
-            item["updated_at"] = _now()
-            raise
         return item
 
     def next_id(self) -> str:
         return str(ulid.new())
 
-    def _start_processing(
+    def start_processing(
         self,
         owner_user_id: str,
         reading_id: str,
@@ -98,7 +90,7 @@ class ReadingRepository:
         if response.get("StatusCode") != 202:
             raise ProcessingStartError
 
-    def _mark_processing_start_failed(self, owner_user_id: str, reading_id: str) -> None:
+    def mark_processing_start_failed(self, owner_user_id: str, reading_id: str) -> None:
         self.table.update_item(
             Key={"pk": f"USER#{owner_user_id}", "sk": f"READING#{reading_id}"},
             UpdateExpression="SET #status = :status, metadata = :metadata, updated_at = :updated_at",

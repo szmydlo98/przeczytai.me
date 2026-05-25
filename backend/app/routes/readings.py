@@ -5,9 +5,9 @@ from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
 from app.errors import ApiException
 from app.models import Reading, ReadingCreateRequest, ReadingListResponse
-from app.repositories.readings import ReadingRepository
-from app.services.readings import create_reading_for_user
+from app.repositories.readings import ProcessingStartError, ReadingRepository
 from app.storage import FileStorage, StorageError
+from app.tts import TTS_VENDOR, TTS_VOICE
 
 router = APIRouter(prefix="/api/v1/readings", tags=["readings"])
 REQUIRED_READING_FIELDS = {
@@ -59,6 +59,66 @@ def _get_user_reading(
     return item
 
 
+def _normalize_original_text(original_text: str, max_text_chars: int) -> str:
+    original_text = original_text.strip()
+    if not original_text:
+        raise ApiException("validation_error", "Original text must not be empty", 422)
+    if len(original_text) > max_text_chars:
+        raise ApiException("payload_too_large", "Original text is too large", 413)
+    return original_text
+
+
+def _store_original_text(
+    *,
+    owner_user_id: str,
+    reading_id: str,
+    original_text: str,
+    storage: FileStorage,
+) -> str:
+    original_text_key = storage.original_text_key(owner_user_id, reading_id)
+    try:
+        storage.put_text(original_text_key, original_text, "text/plain; charset=utf-8")
+    except StorageError as exc:
+        raise ApiException("storage_error", "Failed to store original text", 500) from exc
+    return original_text_key
+
+
+def _create_reading_item(
+    *,
+    owner_user_id: str,
+    reading_id: str,
+    original_text_key: str,
+    char_count: int,
+    repo: ReadingRepository,
+) -> dict:
+    return repo.create(
+        owner_user_id,
+        reading_id,
+        original_text_key,
+        char_count,
+        TTS_VENDOR,
+        TTS_VOICE,
+    )
+
+
+def _start_reading_processing(
+    *,
+    owner_user_id: str,
+    reading_id: str,
+    original_text_key: str,
+    repo: ReadingRepository,
+) -> None:
+    try:
+        repo.start_processing(owner_user_id, reading_id, original_text_key)
+    except ProcessingStartError as exc:
+        repo.mark_processing_start_failed(owner_user_id, reading_id)
+        raise ApiException(
+            "processing_start_failed",
+            "Failed to start reading processing",
+            500,
+        ) from exc
+
+
 @router.post("", response_model=Reading, status_code=status.HTTP_202_ACCEPTED)
 async def create_reading(
     request: ReadingCreateRequest,
@@ -67,12 +127,26 @@ async def create_reading(
     storage: FileStorage = Depends(get_file_storage),
     settings: Settings = Depends(get_settings),
 ) -> Reading:
-    item = create_reading_for_user(
+    original_text = _normalize_original_text(request.original_text, settings.max_text_chars)
+    reading_id = repo.next_id()
+    original_text_key = _store_original_text(
         owner_user_id=user.user_id,
-        original_text=request.original_text,
-        max_text_chars=settings.max_text_chars,
-        repo=repo,
+        reading_id=reading_id,
+        original_text=original_text,
         storage=storage,
+    )
+    item = _create_reading_item(
+        owner_user_id=user.user_id,
+        reading_id=reading_id,
+        original_text_key=original_text_key,
+        char_count=len(original_text),
+        repo=repo,
+    )
+    _start_reading_processing(
+        owner_user_id=user.user_id,
+        reading_id=reading_id,
+        original_text_key=original_text_key,
+        repo=repo,
     )
     return _reading(item)
 

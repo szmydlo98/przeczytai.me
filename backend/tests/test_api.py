@@ -48,6 +48,20 @@ class FakeRepo:
     def next_id(self) -> str:
         return f"id-{len(self.items) + 1}"
 
+    def start_processing(
+        self,
+        owner_user_id: str,
+        reading_id: str,
+        original_text_key: str,
+    ) -> None:
+        del owner_user_id, reading_id, original_text_key
+
+    def mark_processing_start_failed(self, owner_user_id: str, reading_id: str) -> None:
+        item = self.items[(owner_user_id, reading_id)]
+        item["status"] = "failed_to_start"
+        item["metadata"] = {"processing_start_error": "lambda_invoke_failed"}
+        item["updated_at"] = NOW
+
     def list(
         self, owner_user_id: str, limit: int, cursor: str | None
     ) -> tuple[list[dict], str | None]:
@@ -79,16 +93,13 @@ class FakeRepo:
 
 
 class FailingProcessingRepo(FakeRepo):
-    def create(
+    def start_processing(
         self,
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
-        char_count: int,
-        vendor: str | None,
-        voice: str | None,
-    ) -> dict:
-        del owner_user_id, reading_id, original_text_key, char_count, vendor, voice
+    ) -> None:
+        del owner_user_id, reading_id, original_text_key
         raise ProcessingStartError
 
 
@@ -235,12 +246,14 @@ def test_create_and_get_reading() -> None:
 
 def test_create_returns_500_when_processing_start_fails() -> None:
     """Return a processing error when async startup fails."""
-    test_client, _ = client(FailingProcessingRepo())
+    repo = FailingProcessingRepo()
+    test_client, _ = client(repo)
 
     response = test_client.post("/api/v1/readings", json={"original_text": "hello"})
 
     assert response.status_code == 500
     assert response.json()["error"]["code"] == "processing_start_failed"
+    assert repo.get("user_1", "id-1")["status"] == "failed_to_start"
 
 
 def test_list_is_user_scoped() -> None:
