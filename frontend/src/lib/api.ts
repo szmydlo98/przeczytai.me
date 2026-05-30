@@ -1,7 +1,3 @@
-const API_BASE = "";
-
-const API_KEY = "tatuazyk";
-
 export type Reading = {
   id: string;
   original_text_key: string;
@@ -31,13 +27,10 @@ async function apiFetch(
   path: string,
   init: { method?: string; body?: string } = {},
 ) {
-  const headers: Record<string, string> = {
-    "X-Api-Key": API_KEY,
-  };
-  if (init.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-  const res = await fetch(`${API_BASE}${path}`, {
+  const headers: Record<string, string> = {};
+  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+
+  const res = await fetch(path, {
     method: init.method ?? "GET",
     body: init.body,
     headers,
@@ -50,7 +43,7 @@ async function apiFetch(
 }
 
 export async function getHealth(): Promise<Record<string, string>> {
-  const res = await apiFetch("/api/v1/health");
+  const res = await apiFetch("/api/backend/health");
   return res.json();
 }
 
@@ -60,14 +53,14 @@ export async function listReadings(
 ): Promise<ReadingListResponse> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set("cursor", cursor);
-  const res = await apiFetch(`/api/v1/readings?${params}`);
+  const res = await apiFetch(`/api/backend/readings?${params}`);
   return res.json();
 }
 
 export async function createReading(
   body: ReadingCreateRequest,
 ): Promise<Reading> {
-  const res = await apiFetch("/api/v1/readings", {
+  const res = await apiFetch("/api/backend/readings", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -75,7 +68,7 @@ export async function createReading(
 }
 
 export async function deleteReading(id: string): Promise<void> {
-  await apiFetch(`/api/v1/readings/${id}`, { method: "DELETE" });
+  await apiFetch(`/api/backend/readings/${id}`, { method: "DELETE" });
 }
 
 export async function downloadFile(
