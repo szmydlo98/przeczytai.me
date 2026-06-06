@@ -7,7 +7,7 @@ from app.errors import ApiException
 from app.models import Reading, ReadingCreateRequest, ReadingListResponse
 from app.repositories.readings import ProcessingStartError, ReadingRepository
 from app.storage import FileStorage, StorageError
-from app.tts import TTS_VENDOR, TTS_VOICE
+from app.tts import TTS_VENDOR, resolve_tts_voice
 
 router = APIRouter(prefix="/api/v1/readings", tags=["readings"])
 REQUIRED_READING_FIELDS = {
@@ -89,6 +89,7 @@ def _create_reading_item(
     reading_id: str,
     original_text_key: str,
     char_count: int,
+    voice: str,
     repo: ReadingRepository,
 ) -> dict:
     return repo.create(
@@ -97,7 +98,7 @@ def _create_reading_item(
         original_text_key,
         char_count,
         TTS_VENDOR,
-        TTS_VOICE,
+        voice,
     )
 
 
@@ -106,10 +107,11 @@ def _start_reading_processing(
     owner_user_id: str,
     reading_id: str,
     original_text_key: str,
+    voice: str,
     repo: ReadingRepository,
 ) -> None:
     try:
-        repo.start_processing(owner_user_id, reading_id, original_text_key)
+        repo.start_processing(owner_user_id, reading_id, original_text_key, voice)
     except ProcessingStartError as exc:
         repo.mark_processing_start_failed(owner_user_id, reading_id)
         raise ApiException(
@@ -128,6 +130,7 @@ async def create_reading(
     settings: Settings = Depends(get_settings),
 ) -> Reading:
     original_text = _normalize_original_text(request.original_text, settings.max_text_chars)
+    voice = resolve_tts_voice(request.voice)
     reading_id = repo.next_id()
     original_text_key = _store_original_text(
         owner_user_id=user.user_id,
@@ -140,12 +143,14 @@ async def create_reading(
         reading_id=reading_id,
         original_text_key=original_text_key,
         char_count=len(original_text),
+        voice=voice,
         repo=repo,
     )
     _start_reading_processing(
         owner_user_id=user.user_id,
         reading_id=reading_id,
         original_text_key=original_text_key,
+        voice=voice,
         repo=repo,
     )
     return _reading(item)
