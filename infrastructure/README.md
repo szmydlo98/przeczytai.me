@@ -48,7 +48,7 @@ The frontend must request a Clerk JWT from the matching template and send it as
 routes, provide a valid token generated from that Clerk JWT template:
 
 ```bash
-API_BEARER_TOKEN="your-clerk-jwt" python3 -m pytest tests/api_gateway
+CLERK_JWT="your-clerk-jwt" python3 -m pytest tests/api_gateway
 ```
 
 The dev backend stores state at `environments/dev/terraform.tfstate`.

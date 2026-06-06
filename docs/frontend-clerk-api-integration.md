@@ -35,15 +35,11 @@ The token must include an audience claim that matches Terraform:
 }
 ```
 
-The backend Terraform values must match the Clerk token:
-
-```hcl
-clerk_jwt_issuer   = "<the token iss claim>"
-clerk_jwt_audience = "przeczytai-api-dev"
-```
-
-The easiest way to confirm `clerk_jwt_issuer` is to generate one token from the
-template, decode it, and copy the `iss` claim.
+The configured `clerk_jwt_audience` must match this `aud`. Set the backend
+Terraform values (`clerk_jwt_issuer`, `clerk_jwt_audience`) as described in
+[`infrastructure/README.md`](../infrastructure/README.md). To confirm the
+issuer, generate one token from the template, decode it, and copy the `iss`
+claim.
 
 ## Frontend request
 

@@ -32,11 +32,9 @@ def api_base_url() -> str:
 
 @pytest.fixture(scope="session")
 def api_bearer_token() -> str:
-    token = os.getenv("API_BEARER_TOKEN") or os.getenv("CLERK_JWT")
+    token = os.getenv("CLERK_JWT")
     if not token:
-        pytest.skip(
-            "Set API_BEARER_TOKEN or CLERK_JWT to run API Gateway tests against protected routes."
-        )
+        pytest.skip("Set CLERK_JWT to run API Gateway tests against protected routes.")
     return token
 
 
