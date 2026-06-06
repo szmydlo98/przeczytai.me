@@ -33,12 +33,6 @@ variable "max_text_chars" {
   default = 100000
 }
 
-variable "api_key" {
-  type        = string
-  description = "Shared x-api-key value required by the API."
-  sensitive   = true
-}
-
 variable "api_lambda_timeout_seconds" {
   type    = number
   default = 20
@@ -62,6 +56,16 @@ variable "processor_lambda_memory_size" {
 variable "processor_image_tag" {
   type    = string
   default = "latest"
+}
+
+variable "clerk_jwt_issuer" {
+  type        = string
+  description = "Clerk issuer URL for API Gateway JWT authorizer validation."
+}
+
+variable "clerk_jwt_audience" {
+  type        = string
+  description = "Audience claim expected in Clerk JWTs accepted by the API."
 }
 
 variable "budget_limit_usd" {
