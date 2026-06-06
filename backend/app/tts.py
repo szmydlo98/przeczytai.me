@@ -25,5 +25,5 @@ def resolve_tts_voice(voice: str | None) -> str:
 async def synthesize_to_file(text: str, output_path: str, voice: str | None = None) -> None:
     import edge_tts
 
-    communicate = edge_tts.Communicate(text, resolve_tts_voice(voice))
+    communicate = edge_tts.Communicate(text, voice or TTS_VOICE)
     await communicate.save(output_path)
