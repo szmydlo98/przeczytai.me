@@ -1,7 +1,6 @@
 TTS_VENDOR = "edge-tts"
-TTS_VOICE = "pl-PL-ZofiaNeural"
 TTS_VOICES = {
-    "Zofia": TTS_VOICE,
+    "Zofia": "pl-PL-ZofiaNeural",
     "Marek": "pl-PL-MarekNeural",
     "Ava": "en-US-AvaMultilingualNeural",
     "Andrew": "en-US-AndrewMultilingualNeural",
@@ -9,6 +8,7 @@ TTS_VOICES = {
     "Emma": "en-US-EmmaMultilingualNeural",
 }
 SUPPORTED_TTS_VOICES = tuple(TTS_VOICES.values())
+TTS_VOICE = TTS_VOICES["Zofia"]
 
 
 def resolve_tts_voice(voice: str | None) -> str:
