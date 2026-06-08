@@ -7,7 +7,6 @@ TTS_VOICES = {
     "Brian": "en-US-BrianMultilingualNeural",
     "Emma": "en-US-EmmaMultilingualNeural",
 }
-SUPPORTED_TTS_VOICES = tuple(TTS_VOICES.values())
 TTS_VOICE = TTS_VOICES["Zofia"]
 
 
@@ -17,8 +16,6 @@ def resolve_tts_voice(voice: str | None) -> str:
     voice = voice.strip()
     if voice in TTS_VOICES:
         return TTS_VOICES[voice]
-    if voice in SUPPORTED_TTS_VOICES:
-        return voice
     return TTS_VOICE
 
 
