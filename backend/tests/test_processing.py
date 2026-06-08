@@ -52,8 +52,8 @@ class FakeRepo:
         }
 
 
-async def fake_synthesize(text: str, output_path: str) -> None:
-    Path(output_path).write_bytes(f"mp3:{text}".encode())
+async def fake_synthesize(text: str, output_path: str, voice: str | None = None) -> None:
+    Path(output_path).write_bytes(f"mp3:{voice}:{text}".encode())
 
 
 def test_processing_generates_same_text_and_recording() -> None:
@@ -80,7 +80,7 @@ def test_processing_generates_same_text_and_recording() -> None:
     recording_key = "users/user-1/readings/job-1/recording.mp3"
     assert result == {"status": "completed"}
     assert storage.texts[corrected_text_key] == "Ala ma kota."
-    assert storage.bytes[recording_key] == b"mp3:Ala ma kota."
+    assert storage.bytes[recording_key] == b"mp3:pl-PL-ZofiaNeural:Ala ma kota."
     assert repo.completed == {
         "owner_user_id": "user-1",
         "reading_id": "job-1",
@@ -90,4 +90,35 @@ def test_processing_generates_same_text_and_recording() -> None:
             "processor": TTS_VENDOR,
             "voice": TTS_VOICE,
         },
+    }
+
+
+def test_processing_uses_requested_voice() -> None:
+    """Generate the recording with the selected voice from the event."""
+    event = {
+        "reading_id": "job-1",
+        "owner_user_id": "user-1",
+        "original_text_key": "users/user-1/readings/job-1/original.txt",
+        "voice": "Emma",
+    }
+    storage = FakeStorage()
+    repo = FakeRepo()
+
+    asyncio.run(
+        process_reading(
+            event,
+            Settings(readings_table_name="table", files_bucket_name="bucket"),
+            storage,
+            repo,
+            fake_synthesize,
+        )
+    )
+
+    assert storage.bytes["users/user-1/readings/job-1/recording.mp3"] == (
+        b"mp3:en-US-EmmaMultilingualNeural:Ala ma kota."
+    )
+    assert repo.completed is not None
+    assert repo.completed["metadata"] == {
+        "processor": TTS_VENDOR,
+        "voice": "en-US-EmmaMultilingualNeural",
     }

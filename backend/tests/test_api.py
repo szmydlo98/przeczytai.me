@@ -18,6 +18,7 @@ class FakeRepo:
     def __init__(self) -> None:
         self.items: dict[tuple[str, str], dict] = {}
         self.deleted: list[tuple[str, str]] = []
+        self.started: list[dict[str, str | None]] = []
 
     def create(
         self,
@@ -53,8 +54,16 @@ class FakeRepo:
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
+        voice: str | None,
     ) -> None:
-        del owner_user_id, reading_id, original_text_key
+        self.started.append(
+            {
+                "owner_user_id": owner_user_id,
+                "reading_id": reading_id,
+                "original_text_key": original_text_key,
+                "voice": voice,
+            }
+        )
 
     def mark_processing_start_failed(self, owner_user_id: str, reading_id: str) -> None:
         item = self.items[(owner_user_id, reading_id)]
@@ -98,8 +107,9 @@ class FailingProcessingRepo(FakeRepo):
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
+        voice: str | None,
     ) -> None:
-        del owner_user_id, reading_id, original_text_key
+        del owner_user_id, reading_id, original_text_key, voice
         raise ProcessingStartError
 
 
@@ -242,6 +252,20 @@ def test_create_and_get_reading() -> None:
 
     detail = test_client.get(f"/api/v1/readings/{created['id']}").json()
     assert detail["original_text_key"] == created["original_text_key"]
+
+
+def test_create_uses_requested_supported_voice() -> None:
+    """Use a requested Edge TTS voice when it is supported."""
+    test_client, repo = client()
+
+    response = test_client.post(
+        "/api/v1/readings",
+        json={"original_text": "hello", "voice": "Marek"},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["voice"] == "pl-PL-MarekNeural"
+    assert repo.started[0]["voice"] == "pl-PL-MarekNeural"
 
 
 def test_create_returns_500_when_processing_start_fails() -> None:

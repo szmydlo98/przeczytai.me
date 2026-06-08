@@ -68,6 +68,7 @@ class ReadingRepository:
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
+        voice: str | None,
     ) -> None:
         if not self.lambda_client or not self.processor_function_name:
             raise ProcessingStartError
@@ -81,6 +82,7 @@ class ReadingRepository:
                         "reading_id": reading_id,
                         "owner_user_id": owner_user_id,
                         "original_text_key": original_text_key,
+                        "voice": voice,
                     }
                 ).encode(),
             )
