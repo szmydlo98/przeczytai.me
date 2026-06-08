@@ -1,4 +1,5 @@
 # Defaults shown for clarity.
-api_key          = "replace-with-a-long-random-dev-secret"
-allowed_origins  = ["http://localhost:3000"]
-budget_limit_usd = 8
+allowed_origins    = ["http://localhost:3000"]
+budget_limit_usd   = 8
+clerk_jwt_issuer   = "https://your-clerk-domain.clerk.accounts.dev"
+clerk_jwt_audience = "przeczytai-api-dev"

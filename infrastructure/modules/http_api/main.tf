@@ -47,16 +47,32 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_authorizer" "clerk" {
+  api_id           = aws_apigatewayv2_api.this.id
+  name             = "${var.api_name}-clerk"
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+
+  jwt_configuration {
+    issuer   = var.clerk_jwt_issuer
+    audience = [var.clerk_jwt_audience]
+  }
+}
+
 resource "aws_apigatewayv2_route" "readings" {
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = "ANY /api/v1/readings"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "ANY /api/v1/readings"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.clerk.id
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
 resource "aws_apigatewayv2_route" "reading_proxy" {
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = "ANY /api/v1/readings/{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "ANY /api/v1/readings/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.clerk.id
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
 }
 
 resource "aws_apigatewayv2_route" "public_health" {

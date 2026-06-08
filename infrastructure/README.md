@@ -33,13 +33,22 @@ terraform -chdir=infrastructure/environments/dev init
 terraform -chdir=infrastructure/environments/dev apply
 ```
 
-The API requires a shared `x-api-key` header for application endpoints. Docs
-remain public at `/docs`, `/redoc`, and `/openapi.json`. Set `api_key` in
-`infrastructure/environments/dev/terraform.tfvars`, and use the same value when
-running API Gateway tests:
+The API Gateway protects application endpoints with a Clerk JWT authorizer.
+Docs and health checks remain public at `/docs`, `/redoc`, `/openapi.json`,
+and `/api/v1/health`. Set the Clerk JWT authorizer values in
+`infrastructure/environments/dev/terraform.tfvars`:
+
+```hcl
+clerk_jwt_issuer   = "https://your-clerk-domain.clerk.accounts.dev"
+clerk_jwt_audience = "przeczytai-api-dev"
+```
+
+The frontend must request a Clerk JWT from the matching template and send it as
+`Authorization: Bearer <token>`. To run API Gateway tests against protected
+routes, provide a valid token generated from that Clerk JWT template:
 
 ```bash
-API_KEY="your-dev-key" python3 -m pytest tests/api_gateway
+CLERK_JWT="your-clerk-jwt" python3 -m pytest tests/api_gateway
 ```
 
 The dev backend stores state at `environments/dev/terraform.tfstate`.

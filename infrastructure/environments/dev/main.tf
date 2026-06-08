@@ -47,8 +47,6 @@ module "api_lambda" {
 
   environment_variables = {
     ENVIRONMENT             = var.environment
-    AUTH_REQUIRED           = "false"
-    API_KEY                 = var.api_key
     FILES_BUCKET_NAME       = module.storage.files_bucket_name
     MAX_TEXT_CHARS          = tostring(var.max_text_chars)
     PROCESSOR_FUNCTION_NAME = module.processor_lambda.function_name
@@ -137,6 +135,8 @@ module "http_api" {
   lambda_function_name = module.api_lambda.function_name
   lambda_invoke_arn    = module.api_lambda.invoke_arn
   allowed_origins      = var.allowed_origins
+  clerk_jwt_issuer     = var.clerk_jwt_issuer
+  clerk_jwt_audience   = var.clerk_jwt_audience
   tags                 = local.common_tags
 }
 

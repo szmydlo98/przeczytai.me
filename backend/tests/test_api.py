@@ -5,7 +5,6 @@ from starlette.requests import Request
 
 from app.auth import CurrentUser, get_current_user
 from app.config import Settings, get_settings
-from app import main
 from app.main import app
 from app.repositories.readings import ProcessingStartError
 from app.routes.readings import get_file_storage, get_reading_repository
@@ -168,13 +167,13 @@ def client(
     app.dependency_overrides.clear()
     repo = repo or FakeRepo()
     storage = storage or FakeStorage()
-    settings = settings or Settings(max_text_chars=10, api_key="test-api-key")
+    settings = settings or Settings(max_text_chars=10)
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_reading_repository] = lambda: repo
     app.dependency_overrides[get_file_storage] = lambda: storage
     if auth:
         app.dependency_overrides[get_current_user] = lambda: CurrentUser("user_1")
-    return TestClient(app, headers={"x-api-key": settings.api_key or ""}), repo
+    return TestClient(app), repo
 
 
 def test_health() -> None:
@@ -183,35 +182,14 @@ def test_health() -> None:
     assert test_client.get("/api/v1/health").json() == {"status": "ok"}
 
 
-def test_missing_api_key_returns_401() -> None:
-    """Reject requests without the shared API key when configured."""
-    app.dependency_overrides.clear()
-    original_get_middleware_settings = main.get_middleware_settings
-    main.get_middleware_settings = lambda: Settings(api_key="test-api-key")
-    test_client = TestClient(app)
-
-    try:
-        response = test_client.get("/api/v1/health")
-    finally:
-        main.get_middleware_settings = original_get_middleware_settings
-
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "unauthorized"
-
-
-def test_docs_do_not_require_api_key() -> None:
+def test_docs_are_public() -> None:
     """Keep interactive docs public for browser access."""
     app.dependency_overrides.clear()
-    original_get_middleware_settings = main.get_middleware_settings
-    main.get_middleware_settings = lambda: Settings(api_key="test-api-key")
     test_client = TestClient(app)
 
-    try:
-        assert test_client.get("/docs").status_code == 200
-        assert test_client.get("/redoc").status_code == 200
-        assert test_client.get("/openapi.json").status_code == 200
-    finally:
-        main.get_middleware_settings = original_get_middleware_settings
+    assert test_client.get("/docs").status_code == 200
+    assert test_client.get("/redoc").status_code == 200
+    assert test_client.get("/openapi.json").status_code == 200
 
 
 def test_create_rejects_empty_original_text() -> None:
@@ -402,21 +380,9 @@ def test_download_recording_missing_returns_404() -> None:
     assert response.json()["error"]["code"] == "not_found"
 
 
-def test_missing_jwt_uses_unauthenticated_user_when_auth_is_disabled() -> None:
-    """Use the configured public user id when JWT auth is disabled."""
+def test_missing_jwt_returns_401() -> None:
+    """Reject protected endpoints without JWT claims."""
     test_client, _ = client(auth=False)
-    response = test_client.post("/api/v1/readings", json={"original_text": "hello"})
-
-    assert response.status_code == 202
-    assert response.json()["original_text_key"] == "users/anonymous/readings/id-1/original.txt"
-
-
-def test_missing_jwt_returns_401_when_auth_is_required() -> None:
-    """Reject protected endpoints without JWT claims when auth is enabled."""
-    test_client, _ = client(
-        auth=False,
-        settings=Settings(max_text_chars=10, auth_required=True),
-    )
     response = test_client.get("/api/v1/readings")
 
     assert response.status_code == 401
