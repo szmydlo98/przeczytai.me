@@ -22,7 +22,7 @@ export async function backendFetch(
   const token = await getToken();
 
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
 
   const url =

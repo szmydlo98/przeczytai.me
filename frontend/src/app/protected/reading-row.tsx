@@ -51,7 +51,7 @@ export function ReadingRow({ reading }: { reading: Reading }) {
           type="button"
           onClick={() =>
             handleDownload(
-              `/api/backend/readings/${reading.id}/recording`,
+              `/api/v1/readings/${reading.id}/recording`,
               `${reading.id}-recording`,
             )
           }
@@ -64,7 +64,7 @@ export function ReadingRow({ reading }: { reading: Reading }) {
           type="button"
           onClick={() =>
             handleDownload(
-              `/api/backend/readings/${reading.id}/corrected-text`,
+              `/api/v1/readings/${reading.id}/corrected-text`,
               `${reading.id}-corrected.md`,
             )
           }

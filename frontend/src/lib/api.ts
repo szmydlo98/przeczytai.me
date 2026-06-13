@@ -43,7 +43,7 @@ async function apiFetch(
 }
 
 export async function getHealth(): Promise<Record<string, string>> {
-  const res = await apiFetch("/api/backend/health");
+  const res = await apiFetch("/api/v1/health");
   return res.json();
 }
 
@@ -53,14 +53,14 @@ export async function listReadings(
 ): Promise<ReadingListResponse> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) params.set("cursor", cursor);
-  const res = await apiFetch(`/api/backend/readings?${params}`);
+  const res = await apiFetch(`/api/v1/readings?${params}`);
   return res.json();
 }
 
 export async function createReading(
   body: ReadingCreateRequest,
 ): Promise<Reading> {
-  const res = await apiFetch("/api/backend/readings", {
+  const res = await apiFetch("/api/v1/readings", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -68,7 +68,7 @@ export async function createReading(
 }
 
 export async function deleteReading(id: string): Promise<void> {
-  await apiFetch(`/api/backend/readings/${id}`, { method: "DELETE" });
+  await apiFetch(`/api/v1/readings/${id}`, { method: "DELETE" });
 }
 
 export async function downloadFile(
