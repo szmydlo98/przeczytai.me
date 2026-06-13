@@ -1,0 +1,73 @@
+name: Discord Review Notifications
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  notify:
+    name: Send Discord review notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build and send Discord message
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          REVIEW_STATE: ${{ github.event.review.state }}
+          REVIEW_BODY: ${{ github.event.review.body }}
+          REVIEW_URL: ${{ github.event.review.html_url }}
+          REVIEWER: ${{ github.event.review.user.login }}
+          REVIEWER_URL: ${{ github.event.review.user.html_url }}
+          AVATAR_URL: ${{ github.event.review.user.avatar_url }}
+        run: |
+          case "$REVIEW_STATE" in
+            approved)
+              TITLE="PR #${PR_NUMBER} approved"
+              COLOR=5763719
+              ;;
+            changes_requested)
+              TITLE="PR #${PR_NUMBER} changes requested"
+              COLOR=15548997
+              ;;
+            commented)
+              TITLE="PR #${PR_NUMBER} reviewed"
+              COLOR=3447003
+              ;;
+            *)
+              TITLE="PR #${PR_NUMBER} review submitted"
+              COLOR=9807270
+              ;;
+          esac
+
+          if [ -n "$REVIEW_BODY" ]; then
+            DESCRIPTION="$(printf '[%s](%s)\n`%s`\n\n%s\n\n[View review](%s)' "$PR_TITLE" "$PR_URL" "$PR_BRANCH" "$REVIEW_BODY" "$REVIEW_URL")"
+          else
+            DESCRIPTION="$(printf '[%s](%s)\n`%s`\n\n[View review](%s)' "$PR_TITLE" "$PR_URL" "$PR_BRANCH" "$REVIEW_URL")"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg description "$DESCRIPTION" \
+            --argjson color "$COLOR" \
+            --arg reviewer "$REVIEWER" \
+            --arg reviewer_url "$REVIEWER_URL" \
+            --arg avatar_url "$AVATAR_URL" \
+            '{
+              username: "Github PRs",
+              avatar_url: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+              embeds: [{
+                title: $title,
+                description: $description,
+                color: $color,
+                author: { name: $reviewer, url: $reviewer_url, icon_url: $avatar_url }
+              }]
+            }')
+
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK_URL"
