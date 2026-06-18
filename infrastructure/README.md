@@ -39,7 +39,7 @@ and `/api/v1/health`. Set the Clerk JWT authorizer values in
 `infrastructure/environments/dev/terraform.tfvars`:
 
 ```hcl
-clerk_jwt_issuer   = "https://your-clerk-domain.clerk.accounts.dev"
+clerk_jwt_issuer   = "https://fitting-bonefish-84.clerk.accounts.dev"
 clerk_jwt_audience = "przeczytai-api-dev"
 ```
 
@@ -50,6 +50,11 @@ routes, provide a valid token generated from that Clerk JWT template:
 ```bash
 CLERK_JWT="your-clerk-jwt" python3 -m pytest tests/api_gateway
 ```
+
+The legacy `X-Api-Key` header is intentionally not accepted. If
+`X-Api-Key: tatuazyk` can still read `/api/v1/readings`, the deployed API is
+still running the old API key authorizer/configuration and the dev Terraform
+stack needs to be applied.
 
 The dev backend stores state at `environments/dev/terraform.tfstate`.
 
