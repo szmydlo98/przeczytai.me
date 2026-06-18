@@ -35,13 +35,13 @@ This document defines the front-end screens needed for PrzeczytAI.me: a Polish d
 
 ```mermaid
 flowchart TD
-    Landing["/ Landing page"] --> AppEntry["/app protected workspace entry"]
-    AppEntry --> SignIn["/sign-in when anonymous"]
+    Landing["/ Landing page"] --> SignIn["/sign-in"]
     Landing --> SignUp["/sign-up"]
     Landing --> Demo["Public example preview"]
 
-    SignIn --> Workspace["/app Workspace"]
-    SignUp --> Workspace
+    SignIn --> AuthSuccess["Successful authentication"]
+    SignUp --> AuthSuccess
+    AuthSuccess --> Workspace["/app Workspace"]
 
     Workspace --> NewDoc["/app/new New document"]
     Workspace --> Reader["/app/documents/:documentId Reader"]
@@ -120,7 +120,7 @@ Required sections:
 
 Primary actions:
 
-- `Zaloguj sie` routes to `/app`, which sends anonymous users through authentication and returns them to the workspace.
+- `Zaloguj sie` routes to `/sign-in`.
 - `Utworz konto` routes to `/sign-up`.
 - `Przejdz do dokumentow` routes authenticated users to `/app`.
 
@@ -140,9 +140,9 @@ Required elements:
 - Clear title matching action: `Zaloguj sie` or `Utworz konto`.
 - Optional note that documents are stored in the user's private workspace.
 
-Post-auth routes:
+Post-auth routing:
 
-- Existing and new users route automatically to `/app`.
+- Existing and new users are automatically redirected to `/app` after successful sign-in or sign-up.
 
 ### Workspace `/app`
 
@@ -323,7 +323,7 @@ Recommended content:
 
 - Public users can only reach `/`, `/sign-in`, `/sign-up`, `/docs`, `/privacy`, and `/terms`.
 - Private routes redirect anonymous users to `/sign-in`.
-- After successful authentication, users are automatically redirected to `/app`.
+- After successful sign-in or sign-up, users are automatically redirected to `/app`.
 - Authenticated users visiting `/` should see a direct route to `/app`.
 - Processing starts after upload when the user clicks the `czytAI` button.
 - Finished processing jobs route to the reader.
