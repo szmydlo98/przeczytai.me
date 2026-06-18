@@ -7,7 +7,15 @@ from app.errors import ApiException
 from app.models import Reading, ReadingCreateRequest, ReadingListResponse
 from app.repositories.readings import ProcessingStartError, ReadingRepository
 from app.storage import FileStorage, StorageError
-from app.tts import TTS_VENDOR, resolve_tts_voice
+from app.tts import (
+    TtsInputTooLargeError,
+    TtsProviderUnavailableError,
+    TtsSelection,
+    UnsupportedTtsVendorError,
+    ensure_tts_provider_available,
+    resolve_tts_selection,
+    validate_tts_input,
+)
 
 router = APIRouter(prefix="/api/v1/readings", tags=["readings"])
 REQUIRED_READING_FIELDS = {
@@ -68,6 +76,22 @@ def _normalize_original_text(original_text: str, max_text_chars: int) -> str:
     return original_text
 
 
+def _resolve_create_tts_selection(
+    request: ReadingCreateRequest, original_text: str, settings: Settings
+) -> TtsSelection:
+    try:
+        selection = resolve_tts_selection(request.vendor, request.voice)
+        ensure_tts_provider_available(selection, settings)
+        validate_tts_input(original_text, selection)
+        return selection
+    except UnsupportedTtsVendorError as exc:
+        raise ApiException("validation_error", str(exc), 422) from exc
+    except TtsProviderUnavailableError as exc:
+        raise ApiException("provider_unavailable", str(exc), 503) from exc
+    except TtsInputTooLargeError as exc:
+        raise ApiException("payload_too_large", str(exc), 413) from exc
+
+
 def _store_original_text(
     *,
     owner_user_id: str,
@@ -89,6 +113,7 @@ def _create_reading_item(
     reading_id: str,
     original_text_key: str,
     char_count: int,
+    vendor: str,
     voice: str,
     repo: ReadingRepository,
 ) -> dict:
@@ -97,7 +122,7 @@ def _create_reading_item(
         reading_id,
         original_text_key,
         char_count,
-        TTS_VENDOR,
+        vendor,
         voice,
     )
 
@@ -107,11 +132,12 @@ def _start_reading_processing(
     owner_user_id: str,
     reading_id: str,
     original_text_key: str,
+    vendor: str,
     voice: str,
     repo: ReadingRepository,
 ) -> None:
     try:
-        repo.start_processing(owner_user_id, reading_id, original_text_key, voice)
+        repo.start_processing(owner_user_id, reading_id, original_text_key, vendor, voice)
     except ProcessingStartError as exc:
         repo.mark_processing_start_failed(owner_user_id, reading_id)
         raise ApiException(
@@ -130,7 +156,7 @@ async def create_reading(
     settings: Settings = Depends(get_settings),
 ) -> Reading:
     original_text = _normalize_original_text(request.original_text, settings.max_text_chars)
-    voice = resolve_tts_voice(request.voice)
+    selection = _resolve_create_tts_selection(request, original_text, settings)
     reading_id = repo.next_id()
     original_text_key = _store_original_text(
         owner_user_id=user.user_id,
@@ -143,14 +169,16 @@ async def create_reading(
         reading_id=reading_id,
         original_text_key=original_text_key,
         char_count=len(original_text),
-        voice=voice,
+        vendor=selection.vendor,
+        voice=selection.voice,
         repo=repo,
     )
     _start_reading_processing(
         owner_user_id=user.user_id,
         reading_id=reading_id,
         original_text_key=original_text_key,
-        voice=voice,
+        vendor=selection.vendor,
+        voice=selection.voice,
         repo=repo,
     )
     return _reading(item)

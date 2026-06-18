@@ -8,7 +8,7 @@ from app.config import Settings, get_settings
 from app.main import app
 from app.repositories.readings import ProcessingStartError
 from app.routes.readings import get_file_storage, get_reading_repository
-from app.tts import TTS_VENDOR, TTS_VOICE
+from app.tts import OPENAI_TTS_INPUT_MAX_CHARS, TTS_VENDOR, TTS_VOICE
 
 NOW = "2026-05-04T12:00:00Z"
 
@@ -53,6 +53,7 @@ class FakeRepo:
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
+        vendor: str | None,
         voice: str | None,
     ) -> None:
         self.started.append(
@@ -60,6 +61,7 @@ class FakeRepo:
                 "owner_user_id": owner_user_id,
                 "reading_id": reading_id,
                 "original_text_key": original_text_key,
+                "vendor": vendor,
                 "voice": voice,
             }
         )
@@ -106,9 +108,10 @@ class FailingProcessingRepo(FakeRepo):
         owner_user_id: str,
         reading_id: str,
         original_text_key: str,
+        vendor: str | None,
         voice: str | None,
     ) -> None:
-        del owner_user_id, reading_id, original_text_key, voice
+        del owner_user_id, reading_id, original_text_key, vendor, voice
         raise ProcessingStartError
 
 
@@ -214,7 +217,7 @@ def test_create_and_get_reading() -> None:
     test_client, _ = client(storage=storage)
     response = test_client.post(
         "/api/v1/readings",
-        json={"original_text": "hello", "vendor": "aws-polly", "voice": "Ola"},
+        json={"original_text": "hello", "voice": "Ola"},
     )
     assert response.status_code == 202
     created = response.json()
@@ -243,7 +246,67 @@ def test_create_uses_requested_supported_voice() -> None:
 
     assert response.status_code == 202
     assert response.json()["voice"] == "pl-PL-MarekNeural"
+    assert repo.started[0]["vendor"] == TTS_VENDOR
     assert repo.started[0]["voice"] == "pl-PL-MarekNeural"
+
+
+def test_create_uses_requested_openai_vendor() -> None:
+    """Store and start processing with the requested OpenAI TTS provider."""
+    test_client, repo = client(settings=Settings(max_text_chars=5000, openai_tts_enabled=True))
+
+    response = test_client.post(
+        "/api/v1/readings",
+        json={"original_text": "hello", "vendor": "openai", "voice": "coral"},
+    )
+
+    assert response.status_code == 202
+    created = response.json()
+    assert created["vendor"] == "openai"
+    assert created["voice"] == "coral"
+    assert repo.started[0]["vendor"] == "openai"
+    assert repo.started[0]["voice"] == "coral"
+
+
+def test_create_rejects_openai_when_provider_is_not_configured() -> None:
+    """Reject OpenAI TTS requests before creating a reading if credentials are absent."""
+    test_client, _ = client(settings=Settings(max_text_chars=5000, openai_tts_enabled=False))
+
+    response = test_client.post(
+        "/api/v1/readings",
+        json={"original_text": "hello", "vendor": "openai", "voice": "coral"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "provider_unavailable"
+
+
+def test_create_rejects_unsupported_vendor() -> None:
+    """Reject unknown vendors instead of silently switching providers."""
+    test_client, _ = client()
+
+    response = test_client.post(
+        "/api/v1/readings",
+        json={"original_text": "hello", "vendor": "aws-polly"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+def test_create_rejects_openai_text_over_vendor_limit() -> None:
+    """Reject OpenAI TTS requests that exceed the Speech API input limit."""
+    original_text = "x" * (OPENAI_TTS_INPUT_MAX_CHARS + 1)
+    test_client, _ = client(
+        settings=Settings(max_text_chars=len(original_text) + 1, openai_tts_enabled=True)
+    )
+
+    response = test_client.post(
+        "/api/v1/readings",
+        json={"original_text": original_text, "vendor": "openai"},
+    )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "payload_too_large"
 
 
 def test_create_returns_500_when_processing_start_fails() -> None:
@@ -330,8 +393,7 @@ def test_download_corrected_text() -> None:
     assert response.text == "# Hello\n"
     assert response.headers["content-type"].startswith("text/markdown")
     assert (
-        response.headers["content-disposition"]
-        == f'attachment; filename="{item["reading_id"]}.md"'
+        response.headers["content-disposition"] == f'attachment; filename="{item["reading_id"]}.md"'
     )
 
 

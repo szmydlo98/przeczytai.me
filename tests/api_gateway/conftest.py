@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,11 @@ def api_base_url() -> str:
     if url:
         return url.rstrip("/")
 
+    if not shutil.which("terraform"):
+        pytest.skip(
+            "Set API_BASE_URL or install Terraform before running API Gateway tests."
+        )
+
     tf_dir = REPO_ROOT / "infrastructure" / "environments" / "dev"
     result = subprocess.run(
         ["terraform", f"-chdir={tf_dir}", "output", "-raw", "api_base_url"],
@@ -26,7 +32,9 @@ def api_base_url() -> str:
         text=True,
     )
     if result.returncode != 0 or not result.stdout.strip():
-        pytest.skip("Set API_BASE_URL or deploy the dev Terraform stack before running these tests.")
+        pytest.skip(
+            "Set API_BASE_URL or deploy the dev Terraform stack before running these tests."
+        )
     return result.stdout.strip().rstrip("/")
 
 

@@ -51,6 +51,11 @@ routes, provide a valid token generated from that Clerk JWT template:
 CLERK_JWT="your-clerk-jwt" python3 -m pytest tests/api_gateway
 ```
 
+OpenAI TTS is enabled only when `openai_api_key_secret_arn` is set. Create the
+Secrets Manager secret outside Terraform so the API key does not get written to
+Terraform state. The secret value may be the raw API key or JSON containing
+`OPENAI_API_KEY`, `openai_api_key`, or `api_key`.
+
 The dev backend stores state at `environments/dev/terraform.tfstate`.
 
 The processor Lambda is deployed from an ECR image. On the first deploy, create
