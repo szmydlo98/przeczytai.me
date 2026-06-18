@@ -39,7 +39,7 @@ and `/api/v1/health`. Set the Clerk JWT authorizer values in
 `infrastructure/environments/dev/terraform.tfvars`:
 
 ```hcl
-clerk_jwt_issuer   = "https://your-clerk-domain.clerk.accounts.dev"
+clerk_jwt_issuer   = "https://fitting-bonefish-84.clerk.accounts.dev"
 clerk_jwt_audience = "przeczytai-api-dev"
 ```
 
