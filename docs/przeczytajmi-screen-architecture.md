@@ -1,16 +1,16 @@
-# PrzeczytajMi screen architecture
+# PrzeczytAI.me screen architecture
 
-This document defines the front-end screens needed for PrzeczytajMi: a Polish document cleanup and text-to-speech application. It focuses on user-facing routes, navigation paths, screen responsibilities, states, and the main interaction model.
+This document defines the front-end screens needed for PrzeczytAI.me: a Polish document cleanup and text-to-speech application. It focuses on user-facing routes, navigation paths, screen responsibilities, states, and the main interaction model.
 
 ## Product assumptions
 
-- Users upload Polish `.txt` or `.md` files that may contain noisy content: links, tags, headings, footers, metadata, repeated titles, markup, and formatting artifacts.
-- The system automatically prepares Speech Synthesis Markup Language (SSML) optimized for AI reading, creates an MP3 narration, and lets the user review the original text, generated SSML, and audio output.
+- Users upload Polish `.txt` or `.md` files in v1. Other formats may be considered later.
+- After the user starts processing, the system prepares Speech Synthesis Markup Language (SSML) optimized for AI reading, creates an MP3 narration, and lets the user review the original text, generated SSML, and audio output.
 - Users need a private workspace with their uploaded files and generated results.
 - Authentication is handled by Clerk, with sign-in and sign-up routes already expected by the project.
-- MP3 generation happens automatically after upload; there is no manual review or edit step in v1.
-- Each document can be retried once, which clears generated text/audio and reruns cleanup, SSML generation, and audio generation from the original uploaded file.
-- Documents, generated SSML, and MP3 outputs are retained for one year.
+- MP3 generation starts after the user uploads a supported file and clicks the `czytAI` start button. There is no manual review or edit step in v1.
+- Users can retry generation for a document. A retry creates a new processing job linked to the same document and replaces generated text/audio when it succeeds.
+- Original files, generated SSML, and MP3 outputs are deleted when they have not been touched for 365 days.
 - Billing is expected to be subscription-based, but plan details are not defined for v1.
 - Mobile layouts are out of scope for v1; desktop experience is the design target.
 
@@ -18,13 +18,13 @@ This document defines the front-end screens needed for PrzeczytajMi: a Polish do
 
 | Route | Screen | Access | Primary purpose |
 |---|---|---:|---|
-| `/` | Landing page | Public | Explain value, show example, route users to sign in or start. |
+| `/` | Landing page | Public | Explain value, show example, and route users toward the protected workspace. |
 | `/sign-in` | Sign in | Public | Authenticate existing users. |
 | `/sign-up` | Sign up | Public | Create account. |
 | `/app` | User workspace | Private | Show a table of uploaded files, statuses, and generated narrations. |
-| `/app/new` | New document | Private | Upload a `.txt` or `.md` file, optionally define abbreviation readings, and start automatic processing. |
+| `/app/new` | New document | Private | Upload a `.txt` or `.md` file, optionally define abbreviation readings, and start processing. |
 | `/app/jobs` | Processing overview | Private | Show all active and recent processing jobs with compact progress indicators. |
-| `/app/documents/:documentId` | Document reader | Private | Review original/SSML text, play narration, track highlighted sentence, retry once, and download outputs. |
+| `/app/documents/:documentId` | Document reader | Private | Review the original text with playback highlighting, retry generation, and download outputs. |
 | `/app/settings` | Settings | Private | Set default model, voice, playback behavior, exports, and custom abbreviation readings for future documents. |
 | `/app/account` | Account | Private | Manage profile, sign out, connected auth, and data deletion. |
 | `/docs` | Documentation | Public or private | Technical-style product documentation, examples, supported files, and common errors. |
@@ -35,7 +35,8 @@ This document defines the front-end screens needed for PrzeczytajMi: a Polish do
 
 ```mermaid
 flowchart TD
-    Landing["/ Landing page"] --> SignIn["/sign-in"]
+    Landing["/ Landing page"] --> AppEntry["/app protected workspace entry"]
+    AppEntry --> SignIn["/sign-in when anonymous"]
     Landing --> SignUp["/sign-up"]
     Landing --> Demo["Public example preview"]
 
@@ -51,14 +52,15 @@ flowchart TD
 
     NewDoc --> UploadValidate["Validate .txt or .md file"]
     UploadValidate --> Abbreviations["Optional abbreviation readings"]
-    Abbreviations --> AutoProcess["Automatic cleanup + SSML + MP3"]
+    Abbreviations --> Start["User clicks czytAI"]
+    Start --> AutoProcess["Cleanup + SSML + MP3"]
     AutoProcess --> Jobs
     Jobs --> Reader
 
     Reader --> DownloadMP3["Download MP3"]
     Reader --> DownloadSSML["Download generated SSML"]
     Reader --> DownloadOriginal["Download original file"]
-    Reader --> Retry["Retry once"]
+    Reader --> Retry["Retry generation"]
     Retry --> AutoProcess
     Reader --> Workspace
 
@@ -86,7 +88,7 @@ flowchart LR
     DocumentRow --> Status["Processing / Ready / Failed"]
     DocumentRow --> Actions["Open / Retry / Download / Delete"]
 
-    Reader --> TextPanel["Original and generated SSML"]
+    Reader --> TextPanel["Original text with playback highlighting"]
     Reader --> Player["Bottom audio player"]
     Reader --> SidePanel["Downloads / metadata / retry"]
 ```
@@ -106,11 +108,11 @@ Private pages should share one quiet, work-focused shell:
 
 ### Landing page `/`
 
-Goal: quickly explain that PrzeczytajMi turns noisy Polish documents into SSML and generated narration.
+Goal: quickly explain that PrzeczytAI.me turns noisy Polish documents into SSML and generated narration.
 
 Required sections:
 
-- First viewport with product name `PrzeczytajMi`, short value proposition, sign-in button, sign-up button, and a secondary example/demo link.
+- First viewport with product name `PrzeczytAI.me`, short value proposition, sign-in button, sign-up button, and a secondary example/demo link.
 - Animated or graphic example showing dirty source text transformed into SSML. Do not include audio playback on the landing page.
 - Capability section: cleanup, reading markup, Polish voice generation, synchronized highlighting, downloads.
 - Trust/privacy section explaining that documents are private to the user.
@@ -118,14 +120,13 @@ Required sections:
 
 Primary actions:
 
-- `Zaloguj sie` routes to `/sign-in`.
+- `Zaloguj sie` routes to `/app`, which sends anonymous users through authentication and returns them to the workspace.
 - `Utworz konto` routes to `/sign-up`.
-- Authenticated users should see `Przejdz do dokumentow` routing to `/app`.
+- `Przejdz do dokumentow` routes authenticated users to `/app`.
 
 States:
 
 - Public anonymous state.
-- Authenticated returning-user state.
 - Loading auth state with disabled actions.
 
 ### Sign in `/sign-in` and sign up `/sign-up`
@@ -160,14 +161,13 @@ Document table columns:
 - Status: `Processing`, `Ready`, `Failed`.
 - Voice/model used.
 - Character count and generated audio length when available.
-- Retry availability: `Retry available`, `Retry used`, or hidden when not applicable.
+- Retry/action availability when the latest generation failed or the user wants to regenerate output.
 - Quick actions: open, download MP3, download SSML, download original file, retry, delete.
 
 Empty state:
 
 - Title: `Nie masz jeszcze dokumentow`.
 - Action: `Dodaj pierwszy dokument`.
-- Short example of what the app can clean.
 
 Error state:
 
@@ -175,32 +175,31 @@ Error state:
 
 ### New document `/app/new`
 
-Goal: upload a supported file and start automatic cleanup, SSML generation, and narration.
+Goal: upload a supported file and start cleanup, SSML generation, and narration.
 
 Required flow:
 
 1. Upload `.txt` or `.md` file.
 2. Source preview: show file name, type, size, detected character count, and first lines of extracted text.
 3. Optional abbreviation readings: let the user provide abbreviation and full reading text pairs.
-4. Submit action: `Przygotuj tekst i audio`.
+4. Start action: `czytAI`.
 
 Abbreviation handling:
 
-- Explain that PrzeczytajMi tries to read abbreviations correctly by default.
+- Explain that PrzeczytAI.me tries to read abbreviations correctly by default.
 - Allow users to provide exact readings when they want control over a specific abbreviation.
 - Each row should include `Abbreviation` and `Read as` fields, plus add/remove row controls.
-- Examples: `PKP` -> `Polskie Koleje Panstwowe`, `ul.` -> `ulica`.
 - These document-level abbreviation readings apply only to the uploaded document unless the user saves them as defaults in settings.
+- Do not specify lower-level preprocessing rules here; v1 only needs the UI contract for collecting abbreviation readings.
 
 Validation:
 
 - Reject unsupported file types with a specific explanation; v1 accepts only `.txt` and `.md`.
 - Reject extracted text over 10,000 characters for v1.
-- Warn on very short documents.
 - Require exactly one uploaded file.
 - Validate that abbreviation pairs are complete when provided.
 
-After submit:
+After start:
 
 - Route to `/app/jobs` or back to `/app` with visible processing status.
 - Do not show cleanup options in v1; cleanup behavior is internal.
@@ -219,10 +218,12 @@ Required elements:
 - List of active and recent jobs.
 - Per-job status badge: uploaded, extracting text, generating SSML, generating MP3, ready, failed.
 - Per-job progress bar when progress is available.
+- Optional per-job log/progress detail if the backend exposes it.
 - Current step message.
 - Link to the document when ready.
-- Retry action for failed documents if retry has not been used.
+- Retry action for failed documents.
 - Non-blocking note that users can leave this page and return later.
+- Multiple jobs may belong to the same document; for example, the original generation and a later retry.
 
 Failure state:
 
@@ -230,12 +231,12 @@ Failure state:
 
 ### Document reader `/app/documents/:documentId`
 
-Goal: combine reading, listening, review, and downloads in one focused screen.
+Goal: combine reading, listening, status, and downloads in one focused screen.
 
 Desktop layout:
 
-- Main reading column with original text or generated SSML toggle.
-- Sticky right side panel with document metadata, download actions, retry status/action, and processing details.
+- Main reading column with the original text and current-sentence playback highlighting.
+- Sticky right side panel with document metadata, download actions, retry action, and processing details.
 - Persistent bottom audio player spanning the main content area.
 - Sentence-level highlight synced to audio playback.
 - If processing is not ready, the route should render a full-screen warning that the user needs to wait and link to `/app/jobs`.
@@ -243,8 +244,7 @@ Desktop layout:
 Required controls:
 
 - Bottom player controls: play/pause, seek bar, speed control, previous sentence, next sentence.
-- Right side panel actions: download MP3, download generated SSML, download original source file, retry once when available.
-- Toggle original/generated SSML text.
+- Right side panel actions: download MP3, download generated SSML, download original source file, retry generation.
 - Toggle sentence highlights.
 
 Text behavior:
@@ -263,7 +263,6 @@ States:
 - Missing original file but generated SSML available.
 - Empty extracted text.
 - Retry available.
-- Retry already used.
 
 ### Settings `/app/settings`
 
@@ -276,7 +275,7 @@ Sections:
 - Playback: default speed, sentence highlight behavior.
 - Custom abbreviation readings for future documents.
 - Exports: default output file names, MP3 quality, text format.
-- Privacy: one-year retention notice, delete all documents if supported.
+- Privacy: inactive-for-365-days retention notice, delete all documents if supported.
 
 Required behavior:
 
@@ -310,7 +309,7 @@ Recommended content:
 - How custom abbreviation readings work.
 - How to improve pronunciation.
 - Common processing errors and fixes.
-- Privacy and one-year retention summary.
+- Privacy and inactive-for-365-days retention summary.
 
 ## Suggested screens not in the original request
 
@@ -326,7 +325,7 @@ Recommended content:
 - Private routes redirect anonymous users to `/sign-in`.
 - After successful authentication, users are automatically redirected to `/app`.
 - Authenticated users visiting `/` should see a direct route to `/app`.
-- Processing starts automatically after upload.
+- Processing starts after upload when the user clicks the `czytAI` button.
 - Finished processing jobs route to the reader.
 - The reader should always provide a route back to the workspace and to `/app/jobs`.
 - `/app/documents/:documentId` should not show partially processed documents; use the full-screen wait warning instead.
@@ -336,16 +335,16 @@ Recommended content:
 ```mermaid
 stateDiagram-v2
     [*] --> Draft
-    Draft --> Uploaded: .txt or .md submitted
-    Uploaded --> ExtractingText
+    Draft --> Uploaded: .txt or .md uploaded
+    Uploaded --> ExtractingText: user clicks czytAI
     ExtractingText --> GeneratingSSML
     GeneratingSSML --> GeneratingAudio
     GeneratingAudio --> Ready
     ExtractingText --> Failed
     GeneratingSSML --> Failed
     GeneratingAudio --> Failed
-    Failed --> Uploaded: retry once
-    Ready --> Uploaded: retry once
+    Failed --> Uploaded: retry generation
+    Ready --> Uploaded: retry generation
 ```
 
 ## Design direction
@@ -373,18 +372,19 @@ The product should feel like a focused document workspace, not a marketing-heavy
 
 - V1 supports `.txt` and `.md` files only.
 - Users cannot paste text in v1.
-- MP3 generation happens automatically after cleanup/SSML generation.
+- MP3 generation happens after the user uploads a supported file and clicks `czytAI`.
 - Users cannot manually edit generated SSML before audio generation.
-- Users can retry the whole pipeline once per document.
+- Users can retry generation for a document; retry limits are not fixed in this screen spec.
 - `/app/documents/:documentId/edit` is not needed for v1.
 - `/app/jobs` is an aggregate processing overview; there is no `/app/jobs/:jobId` route.
 - Sentence highlighting should be driven by a backend-generated timing map.
 - The product will be subscription-based, with details still undefined.
-- Original files, generated SSML, and MP3 outputs are retained for one year.
+- Original files, generated SSML, and MP3 outputs are deleted after 365 days without being touched.
 
 ## Open product decisions
 
 - What exact subscription limits apply: documents per month, characters per month, storage, or generated audio minutes?
-- What happens after the one retry is used and generation still fails?
+- What exact retry limits apply, if any?
 - Should default abbreviation readings be global per user, grouped by document type, or both?
 - Should `/docs` be fully public, or should some operational documentation require authentication?
+- Should the reader expose an original/generated SSML toggle in v2?
