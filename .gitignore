@@ -3,6 +3,7 @@
 # Claude Code
 AGENTS.md
 CLAUDE.md
+.agents/skills/
 
 # dependencies
 node_modules
@@ -16,6 +17,7 @@ node_modules
 
 # testing
 **/tests/report_*
+/tested_assets/
 
 # python
 __pycache__/
@@ -44,6 +46,7 @@ yarn-error.log*
 .env*
 !.env.local.example
 infrastructure/environments/dev/processor.auto.tfvars.json
+infrastructure/environments/dev/terraform.tfvars
 
 # vercel
 .vercel
