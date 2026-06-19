@@ -21,11 +21,11 @@ EDGE_TTS_VOICES = {
     "Emma": "en-US-EmmaMultilingualNeural",
 }
 EDGE_TTS_VOICE = EDGE_TTS_VOICES["Zofia"]
-TTS_VOICES = EDGE_TTS_VOICES
 TTS_VOICE = EDGE_TTS_VOICE
 
 OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
 OPENAI_TTS_INPUT_MAX_CHARS = 4096
+OPENAI_TTS_OUTPUT_FORMAT = "mp3"
 OPENAI_TTS_VOICE = "alloy"
 OPENAI_TTS_VOICES = {
     "alloy": "alloy",
@@ -78,6 +78,11 @@ class TtsSelection:
 
 
 Synthesizer = Callable[[str, str, TtsSelection, Settings | None], Awaitable[None]]
+ConfigCheck = Callable[[Settings | None], bool]
+
+
+def _always_configured(_settings: Settings | None) -> bool:
+    return True
 
 
 @dataclass(frozen=True)
@@ -86,8 +91,8 @@ class TtsProvider:
     default_voice: str
     voices: Mapping[str, str]
     synthesizer: Synthesizer
+    is_configured: ConfigCheck = _always_configured
     model: str | None = None
-    output_format: str = "mp3"
     output_extension: str = "mp3"
     content_type: str = "audio/mpeg"
     max_input_chars: int | None = None
@@ -103,21 +108,27 @@ class TtsProvider:
         return self.default_voice
 
 
-def resolve_tts_voice(voice: str | None) -> str:
-    return resolve_tts_selection(None, voice).voice
-
-
 async def _synthesize_edge_tts_to_file(
     text: str,
     output_path: str,
     selection: TtsSelection,
     settings: Settings | None,
 ) -> None:
-    del settings
     import edge_tts
 
     communicate = edge_tts.Communicate(text, selection.voice)
     await communicate.save(output_path)
+
+
+def _openai_tts_configured(settings: Settings | None) -> bool:
+    if not settings:
+        return False
+    if settings.openai_tts_enabled is not None:
+        return settings.openai_tts_enabled
+    return bool(
+        (settings.openai_api_key and settings.openai_api_key.strip())
+        or (settings.openai_api_key_secret_arn and settings.openai_api_key_secret_arn.strip())
+    )
 
 
 async def _synthesize_openai_to_file(
@@ -137,12 +148,13 @@ async def _synthesize_openai_to_file(
             model=OPENAI_TTS_MODEL,
             voice=selection.voice,
             input=text,
-            response_format=get_tts_provider(selection.vendor).output_format,
+            response_format=OPENAI_TTS_OUTPUT_FORMAT,
         ) as response:
             Path(output_path).write_bytes(await response.read())
 
 
-# Add another vendor here; the API, repository, and processor stay on the same path.
+# Add another vendor here: register its synthesizer, voices, limits, and (when it needs
+# credentials) an `is_configured` check. The API, repository, and processor stay on the same path.
 TTS_PROVIDERS: dict[str, TtsProvider] = {
     EDGE_TTS_VENDOR: TtsProvider(
         vendor=EDGE_TTS_VENDOR,
@@ -155,6 +167,7 @@ TTS_PROVIDERS: dict[str, TtsProvider] = {
         default_voice=OPENAI_TTS_VOICE,
         voices=OPENAI_TTS_VOICES,
         synthesizer=_synthesize_openai_to_file,
+        is_configured=_openai_tts_configured,
         model=OPENAI_TTS_MODEL,
         max_input_chars=OPENAI_TTS_INPUT_MAX_CHARS,
     ),
@@ -177,19 +190,9 @@ def resolve_tts_selection(vendor: str | None, voice: str | None) -> TtsSelection
     )
 
 
-def _openai_tts_configured(settings: Settings | None) -> bool:
-    if not settings:
-        return False
-    if settings.openai_tts_enabled is not None:
-        return settings.openai_tts_enabled
-    return bool(
-        (settings.openai_api_key and settings.openai_api_key.strip())
-        or (settings.openai_api_key_secret_arn and settings.openai_api_key_secret_arn.strip())
-    )
-
-
 def ensure_tts_provider_available(selection: TtsSelection, settings: Settings | None) -> None:
-    if selection.vendor == OPENAI_TTS_VENDOR and not _openai_tts_configured(settings):
+    provider = get_tts_provider(selection.vendor)
+    if not provider.is_configured(settings):
         raise TtsProviderUnavailableError(selection.vendor)
 
 
@@ -212,6 +215,8 @@ def validate_tts_input(text: str, selection: TtsSelection) -> None:
         raise TtsInputTooLargeError(selection.vendor, provider.max_input_chars)
 
 
+# Cached for the container's lifetime: a rotated secret is only picked up once the Lambda
+# execution environment recycles.
 @lru_cache
 def _get_secret_string(secret_id: str) -> str:
     import boto3
@@ -267,12 +272,9 @@ def get_openai_api_key(settings: Settings | None) -> str | None:
 async def synthesize_to_file(
     text: str,
     output_path: str,
-    selection: TtsSelection | str | None = None,
+    selection: TtsSelection,
     settings: Settings | None = None,
 ) -> None:
-    resolved_selection = (
-        selection if isinstance(selection, TtsSelection) else resolve_tts_selection(None, selection)
-    )
-    validate_tts_input(text, resolved_selection)
-    provider = get_tts_provider(resolved_selection.vendor)
-    await provider.synthesizer(text, output_path, resolved_selection, settings)
+    validate_tts_input(text, selection)
+    provider = get_tts_provider(selection.vendor)
+    await provider.synthesizer(text, output_path, selection, settings)

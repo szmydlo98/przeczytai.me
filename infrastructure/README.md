@@ -51,6 +51,11 @@ routes, provide a valid token generated from that Clerk JWT template:
 CLERK_JWT="your-clerk-jwt" python3 -m pytest tests/api_gateway
 ```
 
+The legacy `X-Api-Key` header is intentionally not accepted. If
+`X-Api-Key: tatuazyk` can still read `/api/v1/readings`, the deployed API is
+still running the old API key authorizer/configuration and the dev Terraform
+stack needs to be applied.
+
 OpenAI TTS is enabled only when `openai_api_key_secret_arn` is set. Create the
 Secrets Manager secret outside Terraform so the API key does not get written to
 Terraform state. The secret value may be the raw API key or JSON containing
