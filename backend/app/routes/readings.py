@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import RedirectResponse
 
@@ -194,8 +196,9 @@ async def download_recording(
     recording_key = item.get("recording_key")
     if not recording_key:
         raise ApiException("not_found", "Recording not found", 404)
+    extension = Path(str(recording_key)).suffix or ".mp3"
     try:
-        url = storage.download_url(str(recording_key), f"{reading_id}-recording.mp3")
+        url = storage.download_url(str(recording_key), f"{reading_id}-recording{extension}")
     except StorageError as exc:
         raise ApiException("storage_error", "Failed to load recording", 500) from exc
     return RedirectResponse(url)

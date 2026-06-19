@@ -430,6 +430,23 @@ def test_download_recording() -> None:
     )
 
 
+def test_download_recording_uses_stored_extension() -> None:
+    """Name the download after the stored recording, not a hardcoded .mp3."""
+    repo = FakeRepo()
+    storage = FakeStorage()
+    item = add_reading(repo, "user_1")
+    item["recording_key"] = f"users/user_1/readings/{item['reading_id']}/recording.wav"
+    test_client, _ = client(repo, storage=storage)
+
+    response = test_client.get(
+        f"/api/v1/readings/{item['reading_id']}/recording",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"].endswith(f"?filename={item['reading_id']}-recording.wav")
+
+
 def test_download_recording_missing_returns_404() -> None:
     """Return not found before recording output is ready."""
     repo = FakeRepo()
