@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.processing import process_reading
-from app.tts import OPENAI_TTS_MODEL, TTS_VENDOR, TTS_VOICE, TtsSelection
+from app.tts import DEFAULT_TTS_VENDOR, EDGE_TTS_VOICE, OPENAI_TTS_MODEL, TtsSelection
 
 
 class FakeStorage:
@@ -77,19 +77,12 @@ async def fake_synthesize(
     text: str,
     output_path: str,
     selection: TtsSelection,
-    settings: Settings | None = None,
+    _settings: Settings | None = None,
 ) -> None:
-    del settings
     Path(output_path).write_bytes(f"mp3:{selection.vendor}:{selection.voice}:{text}".encode())
 
 
-async def failing_synthesize(
-    text: str,
-    output_path: str,
-    selection: TtsSelection,
-    settings: Settings | None = None,
-) -> None:
-    del text, output_path, selection, settings
+async def failing_synthesize(*_args: object) -> None:
     raise RuntimeError("provider failed")
 
 
@@ -124,8 +117,8 @@ def test_processing_generates_same_text_and_recording() -> None:
         "corrected_text_key": corrected_text_key,
         "recording_key": recording_key,
         "metadata": {
-            "processor": TTS_VENDOR,
-            "voice": TTS_VOICE,
+            "processor": DEFAULT_TTS_VENDOR,
+            "voice": EDGE_TTS_VOICE,
         },
     }
 
@@ -157,7 +150,7 @@ def test_processing_uses_requested_voice() -> None:
     )
     assert repo.completed is not None
     assert repo.completed["metadata"] == {
-        "processor": TTS_VENDOR,
+        "processor": DEFAULT_TTS_VENDOR,
         "voice": "en-US-EmmaMultilingualNeural",
     }
 

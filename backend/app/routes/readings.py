@@ -107,46 +107,6 @@ def _store_original_text(
     return original_text_key
 
 
-def _create_reading_item(
-    *,
-    owner_user_id: str,
-    reading_id: str,
-    original_text_key: str,
-    char_count: int,
-    vendor: str,
-    voice: str,
-    repo: ReadingRepository,
-) -> dict:
-    return repo.create(
-        owner_user_id,
-        reading_id,
-        original_text_key,
-        char_count,
-        vendor,
-        voice,
-    )
-
-
-def _start_reading_processing(
-    *,
-    owner_user_id: str,
-    reading_id: str,
-    original_text_key: str,
-    vendor: str,
-    voice: str,
-    repo: ReadingRepository,
-) -> None:
-    try:
-        repo.start_processing(owner_user_id, reading_id, original_text_key, vendor, voice)
-    except ProcessingStartError as exc:
-        repo.mark_processing_start_failed(owner_user_id, reading_id)
-        raise ApiException(
-            "processing_start_failed",
-            "Failed to start reading processing",
-            500,
-        ) from exc
-
-
 @router.post("", response_model=Reading, status_code=status.HTTP_202_ACCEPTED)
 async def create_reading(
     request: ReadingCreateRequest,
@@ -164,23 +124,29 @@ async def create_reading(
         original_text=original_text,
         storage=storage,
     )
-    item = _create_reading_item(
-        owner_user_id=user.user_id,
-        reading_id=reading_id,
-        original_text_key=original_text_key,
-        char_count=len(original_text),
-        vendor=selection.vendor,
-        voice=selection.voice,
-        repo=repo,
+    item = repo.create(
+        user.user_id,
+        reading_id,
+        original_text_key,
+        len(original_text),
+        selection.vendor,
+        selection.voice,
     )
-    _start_reading_processing(
-        owner_user_id=user.user_id,
-        reading_id=reading_id,
-        original_text_key=original_text_key,
-        vendor=selection.vendor,
-        voice=selection.voice,
-        repo=repo,
-    )
+    try:
+        repo.start_processing(
+            user.user_id,
+            reading_id,
+            original_text_key,
+            selection.vendor,
+            selection.voice,
+        )
+    except ProcessingStartError as exc:
+        repo.mark_processing_start_failed(user.user_id, reading_id)
+        raise ApiException(
+            "processing_start_failed",
+            "Failed to start reading processing",
+            500,
+        ) from exc
     return _reading(item)
 
 

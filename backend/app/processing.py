@@ -8,7 +8,6 @@ from app.repositories.readings import ReadingRepository
 from app.storage import FileStorage
 from app.tts import (
     ensure_tts_provider_available,
-    get_tts_provider,
     resolve_tts_selection,
     synthesize_to_file,
     tts_metadata,
@@ -19,10 +18,6 @@ from app.tts import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 TERMINAL_READING_STATUSES = {"completed", "failed"}
-
-
-def _failure_metadata(exc: Exception) -> dict[str, object]:
-    return {"processing_error": type(exc).__name__}
 
 
 async def process_reading(
@@ -40,7 +35,6 @@ async def process_reading(
     owner_user_id = str(event["owner_user_id"])
     original_text_key = str(event["original_text_key"])
     selection = resolve_tts_selection(event.get("vendor"), event.get("voice"))
-    provider = get_tts_provider(selection.vendor)
     recording_path: Path | None = None
 
     try:
@@ -50,7 +44,7 @@ async def process_reading(
 
         ensure_tts_provider_available(selection, settings)
         original_text = storage.get_text(original_text_key)
-        validate_tts_input(original_text, selection)
+        provider = validate_tts_input(original_text, selection)
         corrected_text_key = storage.corrected_text_key(owner_user_id, reading_id)
         recording_key = storage.recording_key(owner_user_id, reading_id, provider.output_extension)
         recording_path = Path("/tmp") / f"{reading_id}.{provider.output_extension}"
@@ -87,7 +81,7 @@ async def process_reading(
             },
         )
         try:
-            repo.mark_failed(owner_user_id, reading_id, _failure_metadata(exc))
+            repo.mark_failed(owner_user_id, reading_id, {"processing_error": type(exc).__name__})
         except Exception:
             logger.exception(
                 "failed to mark reading failed",

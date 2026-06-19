@@ -1,9 +1,9 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  name_prefix  = "${var.project_slug}-${var.environment}"
-  repo_root    = abspath("${path.root}/../../..")
-  backend_path = "${local.repo_root}/backend"
+  name_prefix        = "${var.project_slug}-${var.environment}"
+  repo_root          = abspath("${path.root}/../../..")
+  backend_path       = "${local.repo_root}/backend"
   openai_tts_enabled = var.openai_api_key_secret_arn != ""
 
   processor_environment_variables = merge(
@@ -126,7 +126,7 @@ module "processor_lambda" {
       ]
       resources = ["${module.storage.files_bucket_arn}/*"]
     },
-  ], local.openai_tts_enabled ? [
+    ], local.openai_tts_enabled ? [
     {
       sid       = "ReadOpenaiApiKeySecret"
       actions   = ["secretsmanager:GetSecretValue"]

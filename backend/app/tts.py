@@ -2,7 +2,6 @@ import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from pathlib import Path
 
 from app.config import Settings
 
@@ -11,7 +10,6 @@ EDGE_TTS_VENDOR = "edge-tts"
 OPENAI_TTS_VENDOR = "openai"
 DEFAULT_TTS_VENDOR = EDGE_TTS_VENDOR
 
-TTS_VENDOR = DEFAULT_TTS_VENDOR
 EDGE_TTS_VOICES = {
     "Zofia": "pl-PL-ZofiaNeural",
     "Marek": "pl-PL-MarekNeural",
@@ -21,11 +19,9 @@ EDGE_TTS_VOICES = {
     "Emma": "en-US-EmmaMultilingualNeural",
 }
 EDGE_TTS_VOICE = EDGE_TTS_VOICES["Zofia"]
-TTS_VOICE = EDGE_TTS_VOICE
 
 OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
 OPENAI_TTS_INPUT_MAX_CHARS = 4096
-OPENAI_TTS_OUTPUT_FORMAT = "mp3"
 OPENAI_TTS_VOICE = "alloy"
 OPENAI_TTS_VOICES = {
     "alloy": "alloy",
@@ -44,30 +40,19 @@ OPENAI_TTS_VOICES = {
 }
 
 
-class TtsError(Exception):
+class UnsupportedTtsVendorError(Exception):
     pass
 
 
-class UnsupportedTtsVendorError(TtsError):
-    def __init__(self, vendor: str) -> None:
-        self.vendor = vendor
-        super().__init__(f"Unsupported TTS vendor: {vendor}")
+class TtsInputTooLargeError(Exception):
+    pass
 
 
-class TtsInputTooLargeError(TtsError):
-    def __init__(self, vendor: str, max_chars: int) -> None:
-        self.vendor = vendor
-        self.max_chars = max_chars
-        super().__init__(f"{vendor} TTS input must be {max_chars} characters or fewer")
+class TtsProviderUnavailableError(Exception):
+    pass
 
 
-class TtsProviderUnavailableError(TtsError):
-    def __init__(self, vendor: str) -> None:
-        self.vendor = vendor
-        super().__init__(f"{vendor} TTS is not configured")
-
-
-class TtsConfigurationError(TtsError):
+class TtsConfigurationError(Exception):
     pass
 
 
@@ -81,17 +66,13 @@ Synthesizer = Callable[[str, str, TtsSelection, Settings | None], Awaitable[None
 ConfigCheck = Callable[[Settings | None], bool]
 
 
-def _always_configured(_settings: Settings | None) -> bool:
-    return True
-
-
 @dataclass(frozen=True)
 class TtsProvider:
     vendor: str
     default_voice: str
     voices: Mapping[str, str]
     synthesizer: Synthesizer
-    is_configured: ConfigCheck = _always_configured
+    is_configured: ConfigCheck | None = None
     model: str | None = None
     output_extension: str = "mp3"
     content_type: str = "audio/mpeg"
@@ -141,16 +122,16 @@ async def _synthesize_openai_to_file(
 
     api_key = get_openai_api_key(settings)
     if not api_key:
-        raise TtsProviderUnavailableError(OPENAI_TTS_VENDOR)
+        raise TtsProviderUnavailableError(f"{OPENAI_TTS_VENDOR} TTS is not configured")
 
     async with AsyncOpenAI(api_key=api_key) as client:
         async with client.audio.speech.with_streaming_response.create(
             model=OPENAI_TTS_MODEL,
             voice=selection.voice,
             input=text,
-            response_format=OPENAI_TTS_OUTPUT_FORMAT,
+            response_format="mp3",
         ) as response:
-            Path(output_path).write_bytes(await response.read())
+            await response.stream_to_file(output_path)
 
 
 # Add another vendor here: register its synthesizer, voices, limits, and (when it needs
@@ -179,7 +160,7 @@ def get_tts_provider(vendor: str | None) -> TtsProvider:
     try:
         return TTS_PROVIDERS[normalized_vendor]
     except KeyError as exc:
-        raise UnsupportedTtsVendorError(normalized_vendor) from exc
+        raise UnsupportedTtsVendorError(f"Unsupported TTS vendor: {normalized_vendor}") from exc
 
 
 def resolve_tts_selection(vendor: str | None, voice: str | None) -> TtsSelection:
@@ -192,27 +173,26 @@ def resolve_tts_selection(vendor: str | None, voice: str | None) -> TtsSelection
 
 def ensure_tts_provider_available(selection: TtsSelection, settings: Settings | None) -> None:
     provider = get_tts_provider(selection.vendor)
-    if not provider.is_configured(settings):
-        raise TtsProviderUnavailableError(selection.vendor)
+    if provider.is_configured and not provider.is_configured(settings):
+        raise TtsProviderUnavailableError(f"{selection.vendor} TTS is not configured")
 
 
 def tts_metadata(selection: TtsSelection) -> dict[str, object]:
     provider = get_tts_provider(selection.vendor)
-    metadata: dict[str, object] = {
+    metadata = {
         "processor": provider.vendor,
         "voice": selection.voice,
     }
-    if provider.model:
-        metadata["model"] = provider.model
-    return metadata
+    return metadata | ({"model": provider.model} if provider.model else {})
 
 
-def validate_tts_input(text: str, selection: TtsSelection) -> None:
+def validate_tts_input(text: str, selection: TtsSelection) -> TtsProvider:
     provider = get_tts_provider(selection.vendor)
-    if provider.max_input_chars is None:
-        return
-    if len(text) > provider.max_input_chars:
-        raise TtsInputTooLargeError(selection.vendor, provider.max_input_chars)
+    if provider.max_input_chars is not None and len(text) > provider.max_input_chars:
+        raise TtsInputTooLargeError(
+            f"{selection.vendor} TTS input must be {provider.max_input_chars} characters or fewer"
+        )
+    return provider
 
 
 # Cached for the container's lifetime: a rotated secret is only picked up once the Lambda
@@ -259,13 +239,12 @@ def _extract_openai_api_key(secret: str) -> str:
 
 
 def get_openai_api_key(settings: Settings | None) -> str | None:
-    if settings and settings.openai_api_key and settings.openai_api_key.strip():
-        return settings.openai_api_key.strip()
-    if settings and settings.openai_api_key_secret_arn:
-        secret_id = settings.openai_api_key_secret_arn.strip()
-        api_key = _extract_openai_api_key(_get_secret_string(secret_id)) if secret_id else ""
-        if api_key:
-            return api_key
+    if not settings:
+        return None
+    if api_key := (settings.openai_api_key or "").strip():
+        return api_key
+    if secret_id := (settings.openai_api_key_secret_arn or "").strip():
+        return _extract_openai_api_key(_get_secret_string(secret_id)) or None
     return None
 
 
@@ -275,6 +254,5 @@ async def synthesize_to_file(
     selection: TtsSelection,
     settings: Settings | None = None,
 ) -> None:
-    validate_tts_input(text, selection)
-    provider = get_tts_provider(selection.vendor)
+    provider = validate_tts_input(text, selection)
     await provider.synthesizer(text, output_path, selection, settings)

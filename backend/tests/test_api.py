@@ -8,7 +8,7 @@ from app.config import Settings, get_settings
 from app.main import app
 from app.repositories.readings import ProcessingStartError
 from app.routes.readings import get_file_storage, get_reading_repository
-from app.tts import OPENAI_TTS_INPUT_MAX_CHARS, TTS_VENDOR, TTS_VOICE
+from app.tts import DEFAULT_TTS_VENDOR, EDGE_TTS_VOICE, OPENAI_TTS_INPUT_MAX_CHARS
 
 NOW = "2026-05-04T12:00:00Z"
 
@@ -225,8 +225,8 @@ def test_create_and_get_reading() -> None:
     assert created["original_text_key"] == "users/user_1/readings/id-1/original.txt"
     assert created["corrected_text_key"] is None
     assert created["recording_key"] is None
-    assert created["vendor"] == TTS_VENDOR
-    assert created["voice"] == TTS_VOICE
+    assert created["vendor"] == DEFAULT_TTS_VENDOR
+    assert created["voice"] == EDGE_TTS_VOICE
     assert created["status"] == "processing"
     assert created["char_count"] == 5
     assert storage.texts[created["original_text_key"]] == "hello"
@@ -246,7 +246,7 @@ def test_create_uses_requested_supported_voice() -> None:
 
     assert response.status_code == 202
     assert response.json()["voice"] == "pl-PL-MarekNeural"
-    assert repo.started[0]["vendor"] == TTS_VENDOR
+    assert repo.started[0]["vendor"] == DEFAULT_TTS_VENDOR
     assert repo.started[0]["voice"] == "pl-PL-MarekNeural"
 
 
