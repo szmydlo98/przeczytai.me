@@ -52,7 +52,7 @@ export function ReadingRow({ reading }: { reading: Reading }) {
           onClick={() =>
             handleDownload(
               `/api/v1/readings/${reading.id}/recording`,
-              `${reading.id}-recording`,
+              `${reading.id}-recording.mp3`,
             )
           }
           disabled={!reading.recording_key}

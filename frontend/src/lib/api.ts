@@ -99,5 +99,7 @@ function triggerDownload(url: string, filename: string) {
   a.href = url;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
+  if (url.startsWith("blob:")) {
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
