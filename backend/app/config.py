@@ -23,6 +23,12 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("FILES_BUCKET_NAME", "TEXTS_BUCKET_NAME"),
     )
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    openai_api_key_secret_arn: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("OPENAI_API_KEY_SECRET_ARN", "OPENAI_API_KEY_SECRET_ID"),
+    )
+    openai_tts_enabled: bool | None = Field(default=None, validation_alias="OPENAI_TTS_ENABLED")
 
 
 @lru_cache
