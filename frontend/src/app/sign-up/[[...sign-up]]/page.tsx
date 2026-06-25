@@ -1,9 +1,11 @@
 import { SignUp } from "@clerk/nextjs";
 
-export default function SignUpPage() {
+const SignUpPage = () => {
   return (
     <main className="flex flex-1 items-center justify-center">
       <SignUp />
     </main>
   );
-}
+};
+
+export default SignUpPage;
