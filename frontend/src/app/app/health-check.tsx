@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getHealth } from "@/lib/api";
 
-export function HealthCheck() {
+export const HealthCheck = () => {
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,4 +37,4 @@ export function HealthCheck() {
       </div>
     </section>
   );
-}
+};
