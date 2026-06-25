@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { createReading } from "@/lib/api";
 
-export function CreateReading() {
+export const CreateReading = () => {
   const queryClient = useQueryClient();
 
   const [text, setText] = useState("");
@@ -69,4 +69,4 @@ export function CreateReading() {
       </div>
     </section>
   );
-}
+};

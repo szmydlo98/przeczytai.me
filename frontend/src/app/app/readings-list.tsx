@@ -5,7 +5,7 @@ import { useState } from "react";
 import { listReadings } from "@/lib/api";
 import { ReadingRow } from "./reading-row";
 
-export function ReadingsList() {
+export const ReadingsList = () => {
   const [cursor, setCursor] = useState<string | null>(null);
   const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
   const [pageIndex, setPageIndex] = useState(0);
@@ -80,4 +80,4 @@ export function ReadingsList() {
       </div>
     </section>
   );
-}
+};

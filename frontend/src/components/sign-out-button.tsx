@@ -2,7 +2,7 @@
 
 import { useClerk } from "@clerk/nextjs";
 
-export function SignOutButton({ className }: { className?: string }) {
+export const SignOutButton = ({ className }: { className?: string }) => {
   const { signOut } = useClerk();
 
   return (
@@ -14,4 +14,4 @@ export function SignOutButton({ className }: { className?: string }) {
       Sign out
     </button>
   );
-}
+};

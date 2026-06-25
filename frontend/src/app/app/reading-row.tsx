@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Reading } from "@/lib/api";
 import { deleteReading, downloadFile } from "@/lib/api";
 
-export function ReadingRow({ reading }: { reading: Reading }) {
+export const ReadingRow = ({ reading }: { reading: Reading }) => {
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
@@ -84,4 +84,4 @@ export function ReadingRow({ reading }: { reading: Reading }) {
       </div>
     </div>
   );
-}
+};
