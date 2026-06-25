@@ -22,3 +22,9 @@ documentation.
 - Preserve the public frontend API surface as `/api/v1/*`.
 - Successful sign-in or sign-up should land users on `/app`.
 - Use existing project conventions before introducing new tools or patterns.
+
+## Git Workflow
+
+- Use Conventional Commits structure for commit messages.
+- Pull requests may be based from a `codex/...` branch, but the PR title should
+  not include `codex`.
